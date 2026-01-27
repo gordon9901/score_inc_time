@@ -1,0 +1,86 @@
+/*
+ * @Author: chenhao.gao chenhao.gao@ecarxgroup.com
+ * @Date: 2025-12-24 10:01:11
+ * @LastEditors: chenhao.gao chenhao.gao@ecarxgroup.com
+ * @LastEditTime: 2025-12-24 10:08:15
+ */
+#include "raw_socket.hpp"
+#include "tsync_types.hpp"
+
+#include <cstring>
+#include <unistd.h>
+
+#ifdef _QNX710_
+#include "qnx_raw_shim.hpp"
+#else
+#include "linux_raw_shim.hpp"
+#endif
+
+namespace tsyncd
+{
+
+#ifdef _QNX710_
+
+int setup_raw_socket(int &sockFd, const char *interface_name)
+{
+    int fd = qnx_raw_open(interface_name);
+    if (fd < 0) {
+        sockFd = -1;
+        return -1;
+    }
+    sockFd = fd;
+    return 0;
+}
+
+int raw_recvMsg(int sockFd, void *recv_buffer, ::timespec *hwts, int flag)
+{
+    if (sockFd < 0 || !recv_buffer || !hwts) {
+        return -1;
+    }
+    const int nonblock = (flag != 0) ? 1 : 0;
+    const int max_len = 1500;
+    return qnx_raw_recv(sockFd, recv_buffer, max_len, hwts, nonblock);
+}
+
+int raw_sendMsg(int sockFd, void *buffer, int bufLen, ::timespec *hwts)
+{
+    if (sockFd < 0 || !buffer || bufLen <= 0 || !hwts) {
+        return -1;
+    }
+    return qnx_raw_send(sockFd, buffer, bufLen, hwts);
+}
+
+#else
+
+int setup_raw_socket(int &sockFd, const char *interface_name)
+{
+    int fd = linux_raw_open(interface_name);
+    if (fd < 0)
+        return -1;
+
+    sockFd = fd;
+    return 0;
+}
+
+int raw_recvMsg(int sockFd, void *recv_buffer, ::timespec *hwts, int flag)
+{
+    if (sockFd < 0 || !recv_buffer || !hwts)
+        return -1;
+
+    char buf[2048];
+    const int len = linux_raw_recv(sockFd, buf, static_cast<int>(sizeof(buf)), hwts, flag);
+    if (len < 0)
+        return -1;
+
+    std::memcpy(recv_buffer, buf, static_cast<size_t>(len));
+    return len;
+}
+
+int raw_sendMsg(int sockFd, void *buffer, int bufLen, ::timespec *hwts)
+{
+    return linux_raw_send(sockFd, buffer, bufLen, hwts);
+}
+
+#endif
+
+} // namespace tsyncd

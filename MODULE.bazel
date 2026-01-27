@@ -37,6 +37,7 @@ bazel_dep(name = "rules_cc", version = "0.2.1")
 
 # LLVM Toolchains Rules - host configuration
 bazel_dep(name = "toolchains_llvm", version = "1.4.0")
+bazel_dep(name = "platforms", version = "0.0.11")
 
 llvm = use_extension("@toolchains_llvm//toolchain/extensions:llvm.bzl", "llvm")
 llvm.toolchain(
@@ -47,6 +48,11 @@ use_repo(llvm, "llvm_toolchain")
 use_repo(llvm, "llvm_toolchain_llvm")
 
 register_toolchains("@llvm_toolchain//:all")
+
+register_toolchains(
+    "//toolchains:linux_aarch64_toolchain",
+    "//toolchains:qnx_aarch64_toolchain",
+)
 
 # tooling
 bazel_dep(name = "score_tooling", version = "1.0.1")
