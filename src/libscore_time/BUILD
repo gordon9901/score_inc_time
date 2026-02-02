@@ -1,3 +1,15 @@
+# *******************************************************************************
+# Copyright (c) 2025 Contributors to the Eclipse Foundation
+#
+# See the NOTICE file(s) distributed with this work for additional
+# information regarding copyright ownership.
+#
+# This program and the accompanying materials are made available under the
+# terms of the Apache License Version 2.0 which is available at
+# https://www.apache.org/licenses/LICENSE-2.0
+#
+# SPDX-License-Identifier: Apache-2.0
+# *******************************************************************************
 package(
     default_visibility = ["//visibility:public"],
 )
@@ -13,14 +25,9 @@ cc_library(
         "time_client/score_time.cpp",
     ],
     hdrs = glob(["include/**/*.hpp"]),
-    deps = [
-        "//src/common:common_ipc",
-    ],
-    strip_include_prefix = "include",
-    include_prefix = "score_time",
     copts =
-        ["-std=c++17"]
-        + select({
+        ["-std=c++17"] +
+        select({
             ":is_qnx": [
                 "-D_QNX710_",
                 "-D_QNX_SOURCE",
@@ -28,6 +35,7 @@ cc_library(
             ],
             "//conditions:default": [],
         }),
+    include_prefix = "score_time",
     linkopts = select({
         ":is_qnx": [
             "-lsocket",
@@ -41,4 +49,8 @@ cc_library(
             "-lsupc++",
         ],
     }),
+    strip_include_prefix = "include",
+    deps = [
+        "//src/common:common_ipc",
+    ],
 )
