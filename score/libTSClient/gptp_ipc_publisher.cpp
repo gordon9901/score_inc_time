@@ -16,6 +16,10 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <cstring>
+#include <type_traits>
+
+static_assert(std::is_trivially_copyable<score::td::PtpTimeInfo>::value,
+              "PtpTimeInfo must be trivially copyable for seqlock memcpy to be valid");
 
 namespace score
 {
@@ -31,9 +35,14 @@ GptpIpcPublisher::~GptpIpcPublisher()
 
 bool GptpIpcPublisher::Init(const std::string& ipc_name)
 {
+    if (region_ != nullptr)
+        return true;
+
     ipc_name_ = ipc_name;
 
-    shm_fd_ = ::shm_open(ipc_name_.c_str(), O_CREAT | O_RDWR, 0666);
+    (void)::shm_unlink(ipc_name_.c_str());
+
+    shm_fd_ = ::shm_open(ipc_name_.c_str(), O_CREAT | O_RDWR, 0600);
     if (shm_fd_ < 0)
         return false;
 
@@ -62,11 +71,13 @@ void GptpIpcPublisher::Publish(const score::td::PtpTimeInfo& info)
         return;
 
     const std::uint32_t next = region_->seq.load(std::memory_order_relaxed) + 1U;
-    region_->seq.store(next, std::memory_order_release);
+    region_->seq.store(next, std::memory_order_relaxed);
+    // Release fence: prevents the data writes below from being reordered before
+    // the seq=odd store above on weakly-ordered CPUs (ARM64/QNX).  The acquire
+    // half of acq_rel is unnecessary for a seqlock writer; release suffices here.
+    std::atomic_thread_fence(std::memory_order_release);
 
-    std::atomic_thread_fence(std::memory_order_release);
     std::memcpy(&region_->data, &info, sizeof(score::td::PtpTimeInfo));
-    std::atomic_thread_fence(std::memory_order_release);
 
     region_->seq_confirm.store(next + 1U, std::memory_order_release);
     region_->seq.store(next + 1U, std::memory_order_release);
@@ -76,6 +87,7 @@ void GptpIpcPublisher::Destroy()
 {
     if (region_ != nullptr)
     {
+        region_->~GptpIpcRegion();
         ::munmap(region_, sizeof(GptpIpcRegion));
         region_ = nullptr;
     }

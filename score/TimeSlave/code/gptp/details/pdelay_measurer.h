@@ -65,13 +65,13 @@ class PeerDelayMeasurer final
     PDelayResult GetResult() const;
 
   private:
-    void ComputeAndStore() noexcept;
+    void ComputeAndStoreUnlocked() noexcept;
 
     ClockIdentity local_identity_{};
 
     mutable std::mutex mutex_;
 
-    int seqnum_{0};
+    std::uint16_t seqnum_{0U};
     PTPMessage req_{};
     PTPMessage resp_{};
     PTPMessage resp_fup_{};

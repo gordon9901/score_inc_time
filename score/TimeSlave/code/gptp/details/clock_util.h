@@ -10,17 +10,31 @@
  *
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
-#ifndef SCORE_TIMESLAVE_CODE_COMMON_LOGGING_CONTEXTS_H
-#define SCORE_TIMESLAVE_CODE_COMMON_LOGGING_CONTEXTS_H
+#ifndef SCORE_TIMESLAVE_CODE_GPTP_DETAILS_CLOCK_UTIL_H
+#define SCORE_TIMESLAVE_CODE_GPTP_DETAILS_CLOCK_UTIL_H
+
+#include "score/TimeSlave/code/gptp/details/ptp_types.h"
+
+#include <time.h>
+#include <cstdint>
 
 namespace score
 {
 namespace ts
 {
+namespace details
+{
 
-constexpr auto kGPtpMachineContext = "GPTP_SLAVE";
+inline std::int64_t MonoNs() noexcept
+{
+    ::timespec ts{};
+    if (::clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+    return static_cast<std::int64_t>(ts.tv_sec) * kNsPerSec + ts.tv_nsec;
+}
 
+}  // namespace details
 }  // namespace ts
 }  // namespace score
 
-#endif  // SCORE_TIMESLAVE_CODE_COMMON_LOGGING_CONTEXTS_H
+#endif  // SCORE_TIMESLAVE_CODE_GPTP_DETAILS_CLOCK_UTIL_H

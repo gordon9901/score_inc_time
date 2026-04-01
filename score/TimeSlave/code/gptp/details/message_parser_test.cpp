@@ -78,7 +78,7 @@ std::vector<std::uint8_t> BuildPayload(std::uint8_t msgtype,
     std::memcpy(buf.data() + 20, &clock_id, 8);
     PutU16Be(buf.data(), 28, port_number);
     PutU16Be(buf.data(), 30, seqId);
-    buf[32] = kCtlFollowUp;
+    buf[32] = static_cast<std::uint8_t>(ControlField::kFollowUp);
 
     // Timestamp body at offset 34: seconds_msb(u16) + seconds_lsb(u32) + nanoseconds(u32)
     PutU16Be(buf.data(), kHdrSize, 0U);  // seconds_msb = 0
@@ -176,8 +176,8 @@ TEST_F(MessageParserTest, PdelayResp_Body_TimestampDecodedCorrectly)
     PTPMessage msg{};
     ASSERT_TRUE(parser_.Parse(buf.data(), buf.size(), msg));
     EXPECT_EQ(msg.msgtype, kPtpMsgtypePdelayResp);
-    EXPECT_EQ(msg.pdelay_resp.responseOriginTimestamp.seconds_lsb, kSecLsb);
-    EXPECT_EQ(msg.pdelay_resp.responseOriginTimestamp.nanoseconds, kNs);
+    EXPECT_EQ(msg.pdelay_resp.requestReceiptTimestamp.seconds_lsb, kSecLsb);
+    EXPECT_EQ(msg.pdelay_resp.requestReceiptTimestamp.nanoseconds, kNs);
 }
 
 // ── PdelayRespFollowUp body ───────────────────────────────────────────────────
@@ -203,6 +203,39 @@ TEST_F(MessageParserTest, UnknownMsgtype_ReturnsTrue_HeaderParsed)
     PTPMessage msg{};
     ASSERT_TRUE(parser_.Parse(buf.data(), buf.size(), msg));
     EXPECT_EQ(msg.msgtype, kPtpMsgtypePdelayReq);
+}
+
+// ── TimestampToTmv / TmvToTimestamp overflow guards ───────────────────────────
+
+TEST_F(MessageParserTest, TimestampToTmv_SecExceedsMax_ReturnsZero)
+{
+    // seconds_msb=3 → sec = 3 * 2^32 = 12,884,901,888 > kMaxSec (9,223,372,036)
+    Timestamp ts{};
+    ts.seconds_msb = 3U;
+    ts.seconds_lsb = 0U;
+    ts.nanoseconds = 0U;
+    const TmvT result = TimestampToTmv(ts);
+    EXPECT_EQ(result.ns, 0LL);
+}
+
+TEST_F(MessageParserTest, TimestampToTmv_TotalNsExceedsMax_ReturnsZero)
+{
+    // sec = kMaxSec = 9,223,372,036 (seconds_msb=2, seconds_lsb=633,437,444)
+    // total_ns = kMaxSec * 1e9 + 854,775,808 > INT64_MAX
+    Timestamp ts{};
+    ts.seconds_msb = 2U;
+    ts.seconds_lsb = 633'437'444U;
+    ts.nanoseconds = 854'775'808U;
+    const TmvT result = TimestampToTmv(ts);
+    EXPECT_EQ(result.ns, 0LL);
+}
+
+TEST_F(MessageParserTest, TmvToTimestamp_NegativeNs_ReturnsZeroTimestamp)
+{
+    const Timestamp ts = TmvToTimestamp(TmvT{-1LL});
+    EXPECT_EQ(ts.seconds_msb, 0U);
+    EXPECT_EQ(ts.seconds_lsb, 0U);
+    EXPECT_EQ(ts.nanoseconds, 0U);
 }
 
 }  // namespace details

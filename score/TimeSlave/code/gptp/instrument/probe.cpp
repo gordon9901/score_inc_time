@@ -36,9 +36,10 @@ void ProbeManager::Trace(ProbePoint point, const ProbeData& data)
         << "PROBE point=" << static_cast<int>(point) << " ts=" << data.ts_mono_ns << " val=" << data.value_ns
         << " seq=" << data.seq_id;
 
-    if (recorder_ != nullptr && recorder_->IsEnabled())
+    Recorder* const rec = recorder_.load(std::memory_order_acquire);
+    if (rec != nullptr && rec->IsEnabled())
     {
-        recorder_->Record(RecordEntry{
+        rec->Record(RecordEntry{
             data.ts_mono_ns,
             RecordEvent::kProbe,
             data.value_ns,
@@ -52,8 +53,9 @@ void ProbeManager::Trace(ProbePoint point, const ProbeData& data)
 std::int64_t ProbeMonoNs() noexcept
 {
     ::timespec ts{};
-    ::clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec * 1'000'000'000LL + ts.tv_nsec;
+    if (::clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+    return static_cast<std::int64_t>(ts.tv_sec) * 1'000'000'000LL + static_cast<std::int64_t>(ts.tv_nsec);
 }
 
 }  // namespace details

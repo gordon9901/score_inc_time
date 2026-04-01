@@ -81,6 +81,15 @@ cc_library(
 )
 
 cc_library(
+    name = "clock_util",
+    hdrs = ["clock_util.h"],
+    features = COMPILER_WARNING_FEATURES,
+    tags = ["QM"],
+    visibility = ["//score:__subpackages__"],
+    deps = [":ptp_types"],
+)
+
+cc_library(
     name = "sync_state_machine",
     srcs = ["sync_state_machine.cpp"],
     hdrs = ["sync_state_machine.h"],
@@ -88,6 +97,7 @@ cc_library(
     tags = ["QM"],
     visibility = ["//score:__subpackages__"],
     deps = [
+        ":clock_util",
         ":ptp_types",
         "//score/TimeDaemon/code/common/data_types:ptp_time_info",
     ],
@@ -143,6 +153,18 @@ cc_library(
 )
 
 cc_test(
+    name = "raw_socket_test",
+    srcs = ["raw_socket_test.cpp"],
+    tags = ["unit"],
+    deps = [
+        ":network_identity",
+        ":raw_socket",
+        "@googletest//:gtest",
+        "@googletest//:gtest_main",
+    ],
+)
+
+cc_test(
     name = "pdelay_measurer_test",
     srcs = ["pdelay_measurer_test.cpp"],
     tags = ["unit"],
@@ -192,6 +214,7 @@ cc_unit_test_suites_for_host_and_qnx(
         ":frame_codec_test",
         ":message_parser_test",
         ":pdelay_measurer_test",
+        ":raw_socket_test",
         ":sync_state_machine_test",
     ],
     test_suites_from_sub_packages = [],

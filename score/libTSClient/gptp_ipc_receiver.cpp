@@ -14,6 +14,7 @@
 
 #include <fcntl.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <unistd.h>
 #include <cstring>
 
@@ -33,9 +34,22 @@ GptpIpcReceiver::~GptpIpcReceiver()
 
 bool GptpIpcReceiver::Init(const std::string& ipc_name)
 {
+    if (region_ != nullptr)
+        return true;
+
     shm_fd_ = ::shm_open(ipc_name.c_str(), O_RDONLY, 0);
     if (shm_fd_ < 0)
         return false;
+
+    {
+        struct ::stat st{};
+        if (::fstat(shm_fd_, &st) != 0 || static_cast<std::size_t>(st.st_size) < sizeof(GptpIpcRegion))
+        {
+            ::close(shm_fd_);
+            shm_fd_ = -1;
+            return false;
+        }
+    }
 
     void* ptr = ::mmap(nullptr, sizeof(GptpIpcRegion), PROT_READ, MAP_SHARED, shm_fd_, 0);
     if (ptr == MAP_FAILED)
@@ -47,7 +61,7 @@ bool GptpIpcReceiver::Init(const std::string& ipc_name)
 
     region_ = static_cast<const GptpIpcRegion*>(ptr);
 
-    if (region_->magic != kGptpIpcMagic)
+    if (region_->magic.load(std::memory_order_acquire) != kGptpIpcMagic)
     {
         Close();
         return false;
@@ -66,16 +80,24 @@ std::optional<score::td::PtpTimeInfo> GptpIpcReceiver::Receive()
         const std::uint32_t seq1 = region_->seq.load(std::memory_order_acquire);
 
         if ((seq1 & 1U) != 0U)
-            continue;
+            continue;  // write in progress, retry
 
-        std::atomic_thread_fence(std::memory_order_acquire);
         score::td::PtpTimeInfo data{};
         std::memcpy(&data, &region_->data, sizeof(score::td::PtpTimeInfo));
-        std::atomic_thread_fence(std::memory_order_acquire);
+
+        // acq_rel fence: prevents data reads from floating past the consistency checks below
+        // (release half prevents memcpy reordering after the fence on ARM64), and prevents
+        // the seq/seq_confirm loads below from floating before the data reads (acquire half).
+        std::atomic_thread_fence(std::memory_order_acq_rel);
 
         const std::uint32_t seq2 = region_->seq_confirm.load(std::memory_order_acquire);
+        // Re-read seq to detect a write that started AFTER our initial seq1 snapshot.
+        // Without this, a writer that sets seq=odd after seq1 was loaded would go undetected:
+        // seq_confirm would still hold the old even value, causing the reader to return
+        // partially-written data (seqlock race on all multi-core platforms).
+        const std::uint32_t seq3 = region_->seq.load(std::memory_order_acquire);
 
-        if (seq1 == seq2)
+        if (seq1 == seq2 && seq1 == seq3)
             return data;
     }
 

@@ -179,6 +179,52 @@ TEST_F(RecorderFileTest, Record_FieldsWrittenCorrectly)
     EXPECT_EQ(data, "9000000000,2,12345,999,7,1");
 }
 
+TEST_F(RecorderFileTest, ExistingFile_HeaderNotWrittenAgain)
+{
+    // Pre-populate the file so tellp() != 0 when the Recorder opens it in
+    // append mode — the header-write branch must be skipped.
+    {
+        std::ofstream f(path_);
+        f << "existing_line\n";
+    }
+
+    {
+        auto r = MakeRecorder();
+    }
+
+    std::ifstream f(path_);
+    std::string line1, line2;
+    ASSERT_TRUE(std::getline(f, line1));
+    EXPECT_EQ(line1, "existing_line");
+    if (std::getline(f, line2))
+    {
+        EXPECT_NE(line2, "mono_ns,event,offset_ns,pdelay_ns,seq_id,status_flags");
+    }
+}
+
+TEST_F(RecorderFileTest, Record_FlushIntervalOne_TriggersFlushAfterEachRecord)
+{
+    // flush_interval=1: after the first Record() flush_counter_ reaches the
+    // threshold, exercising the flush branch and the counter reset path.
+    Recorder::Config cfg;
+    cfg.enabled = true;
+    cfg.file_path = path_;
+    cfg.flush_interval = 1U;
+    Recorder r{cfg};
+
+    RecordEntry e{};
+    e.mono_ns = 42LL;
+    e.event = RecordEvent::kSyncReceived;
+    r.Record(e);
+
+    std::ifstream f(path_);
+    int lines = 0;
+    std::string line;
+    while (std::getline(f, line))
+        ++lines;
+    EXPECT_GE(lines, 2);  // header + at least 1 data line
+}
+
 }  // namespace details
 }  // namespace ts
 }  // namespace score

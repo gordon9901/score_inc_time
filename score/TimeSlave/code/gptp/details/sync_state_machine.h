@@ -81,16 +81,15 @@ class SyncStateMachine final
     PTPMessage last_sync_{};
     PTPMessage last_fup_{};
     std::int64_t last_master_ns_{0};
+    bool has_previous_master_{false};
     std::int64_t jump_future_threshold_ns_;
 
-    // neighborRateRatio computation (IEEE 802.1AS Clause 11.4.1)
     std::int64_t prev_slave_rx_ns_{0};
     std::int64_t prev_master_origin_ns_{0};
     double neighbor_rate_ratio_{1.0};
 
-    /// Monotonic timestamp of the last successful Sync+FUP pair (ns).
-    /// Atomic so that IsTimeout() can be called from a different thread.
     std::atomic<std::int64_t> last_sync_mono_ns_{0};
+    std::atomic<std::int64_t> created_mono_ns_;
 };
 
 }  // namespace details

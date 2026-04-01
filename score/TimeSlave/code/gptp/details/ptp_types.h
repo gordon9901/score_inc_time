@@ -16,6 +16,7 @@
 #include <netinet/in.h>
 #include <cstdint>
 #include <cstring>
+#include <limits>
 
 #ifndef _QNX_PLAT
 #include <linux/if_ether.h>
@@ -29,9 +30,7 @@ struct ethhdr
 };
 #endif
 
-#ifndef PACKED
-#define PACKED __attribute__((packed))
-#endif
+#define SCORE_TS_PACKED __attribute__((packed))
 
 namespace score
 {
@@ -41,12 +40,12 @@ namespace details
 {
 
 // ─── EtherType constants ────────────────────────────────────────────────────
-constexpr int kEthP1588 = 0x88F7;
-constexpr int kEthP8021Q = 0x8100;
+constexpr std::uint16_t kEthP1588  = 0x88F7U;
+constexpr std::uint16_t kEthP8021Q = 0x8100U;
 
 // ─── MAC / buffer sizes ─────────────────────────────────────────────────────
-constexpr int kMacAddrLen = 6;
-constexpr int kVlanTagLen = 4;
+constexpr std::size_t kMacAddrLen = 6U;
+constexpr std::size_t kVlanTagLen = 4U;
 
 // ─── PTP message-type codes ─────────────────────────────────────────────────
 constexpr std::uint8_t kPtpMsgtypeSync = 0x0;
@@ -61,19 +60,15 @@ constexpr std::uint8_t kPtpVersion = 2U;
 
 constexpr std::int64_t kNsPerSec = 1'000'000'000LL;
 
-// ─── MAC addresses ───────────────────────────────────────────────────────────
-constexpr const char* kPtpSrcMac = "02:00:00:FF:00:11";
-constexpr const char* kPtpDstMac = "01:80:C2:00:00:0E";
-
 // ─── Control field ───────────────────────────────────────────────────────────
-enum ControlField : std::uint8_t
+enum class ControlField : std::uint8_t
 {
-    kCtlSync = 0,
-    kCtlDelayReq = 1,
-    kCtlFollowUp = 2,
-    kCtlDelayResp = 3,
-    kCtlManagement = 4,
-    kCtlOther = 5
+    kSync = 0,
+    kDelayReq = 1,
+    kFollowUp = 2,
+    kDelayResp = 3,
+    kManagement = 4,
+    kOther = 5
 };
 
 // ─── State machine states ────────────────────────────────────────────────────
@@ -90,26 +85,26 @@ struct TmvT
     std::int64_t ns{0};
 };
 
-// ─── PTP wire structures (all PACKED) ────────────────────────────────────────
-struct PACKED ClockIdentity
+// ─── PTP wire structures (all SCORE_TS_PACKED) ───────────────────────────────
+struct SCORE_TS_PACKED ClockIdentity
 {
     std::uint8_t id[8]{};
 };
 
-struct PACKED PortIdentity
+struct SCORE_TS_PACKED PortIdentity
 {
     ClockIdentity clockIdentity;
     std::uint16_t portNumber{0};
 };
 
-struct PACKED Timestamp
+struct SCORE_TS_PACKED Timestamp
 {
     std::uint16_t seconds_msb{0};
     std::uint32_t seconds_lsb{0};
     std::uint32_t nanoseconds{0};
 };
 
-struct PACKED PTPHeader
+struct SCORE_TS_PACKED PTPHeader
 {
     std::uint8_t tsmt{0};
     std::uint8_t version{0};
@@ -125,47 +120,47 @@ struct PACKED PTPHeader
     std::int8_t logMessageInterval{0};
 };
 
-struct PACKED SyncBody
+struct SCORE_TS_PACKED SyncBody
 {
     PTPHeader ptpHdr{};
     Timestamp originTimestamp{};
 };
 
-struct PACKED FollowUpBody
+struct SCORE_TS_PACKED FollowUpBody
 {
     PTPHeader ptpHdr{};
     Timestamp preciseOriginTimestamp{};
 };
 
-struct PACKED PdelayReqBody
+struct SCORE_TS_PACKED PdelayReqBody
 {
     PTPHeader ptpHdr{};
     Timestamp requestReceiptTimestamp{};
     PortIdentity reserved{};
 };
 
-struct PACKED PdelayRespBody
+struct SCORE_TS_PACKED PdelayRespBody
 {
     PTPHeader ptpHdr{};
-    Timestamp responseOriginTimestamp{};
+    Timestamp requestReceiptTimestamp{};  ///< IEEE 802.1AS: t₂ — time the remote peer received our PdelayReq
     PortIdentity requestingPortIdentity{};
 };
 
-struct PACKED PdelayRespFollowUpBody
+struct SCORE_TS_PACKED PdelayRespFollowUpBody
 {
     PTPHeader ptpHdr{};
     Timestamp responseOriginReceiptTimestamp{};
     PortIdentity requestingPortIdentity{};
 };
 
-struct PACKED RawMessageData
+struct SCORE_TS_PACKED RawMessageData
 {
     std::uint8_t buffer[1500]{};
 };
 
 struct PTPMessage
 {
-    union PACKED
+    union SCORE_TS_PACKED
     {
         PTPHeader ptpHdr;
         SyncBody sync;
@@ -189,11 +184,21 @@ inline TmvT TimestampToTmv(const Timestamp& ts) noexcept
 {
     const std::uint64_t sec =
         (static_cast<std::uint64_t>(ts.seconds_msb) << 32U) | static_cast<std::uint64_t>(ts.seconds_lsb);
-    return TmvT{static_cast<std::int64_t>(sec * static_cast<std::uint64_t>(kNsPerSec) + ts.nanoseconds)};
+    constexpr std::uint64_t kMaxNs =
+        static_cast<std::uint64_t>(std::numeric_limits<std::int64_t>::max());
+    constexpr std::uint64_t kMaxSec = kMaxNs / static_cast<std::uint64_t>(kNsPerSec);
+    if (sec > kMaxSec)
+        return TmvT{};
+    const std::uint64_t total_ns = sec * static_cast<std::uint64_t>(kNsPerSec) + ts.nanoseconds;
+    if (total_ns > kMaxNs)
+        return TmvT{};
+    return TmvT{static_cast<std::int64_t>(total_ns)};
 }
 
 inline Timestamp TmvToTimestamp(const TmvT& x) noexcept
 {
+    if (x.ns < 0)
+        return Timestamp{};  // negative timestamps are invalid on the wire
     Timestamp t{};
     const std::uint64_t sec = static_cast<std::uint64_t>(x.ns) / 1'000'000'000ULL;
     const std::uint64_t nsec = static_cast<std::uint64_t>(x.ns) % 1'000'000'000ULL;
@@ -205,7 +210,7 @@ inline Timestamp TmvToTimestamp(const TmvT& x) noexcept
 
 inline TmvT CorrectionToTmv(std::int64_t corr) noexcept
 {
-    return TmvT{corr >> 16};
+    return TmvT{corr / 65536LL};
 }
 
 inline std::uint64_t ClockIdentityToU64(const ClockIdentity& ci) noexcept

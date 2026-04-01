@@ -68,7 +68,7 @@ class ProbeManager final
     /// Optional: link to a Recorder for persistent probe output.
     void SetRecorder(Recorder* recorder)
     {
-        recorder_ = recorder;
+        recorder_.store(recorder, std::memory_order_release);
     }
 
     /// Record a probe event. Thread-safe.
@@ -77,7 +77,7 @@ class ProbeManager final
   private:
     ProbeManager() = default;
     std::atomic<bool> enabled_{false};
-    Recorder* recorder_{nullptr};
+    std::atomic<Recorder*> recorder_{nullptr};
 };
 
 /// Returns the current monotonic timestamp in nanoseconds.

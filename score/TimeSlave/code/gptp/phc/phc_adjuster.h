@@ -43,7 +43,7 @@ class PhcAdjuster final
 {
   public:
     explicit PhcAdjuster(PhcConfig cfg);
-    ~PhcAdjuster();
+    ~PhcAdjuster() noexcept;
 
     PhcAdjuster(const PhcAdjuster&) = delete;
     PhcAdjuster& operator=(const PhcAdjuster&) = delete;

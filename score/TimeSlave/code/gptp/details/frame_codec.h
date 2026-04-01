@@ -15,6 +15,7 @@
 
 #include "score/TimeSlave/code/gptp/details/ptp_types.h"
 
+#include <array>
 #include <cstddef>
 #include <cstdint>
 
@@ -54,9 +55,13 @@ class FrameCodec final
      *
      * @param buf      Buffer large enough to hold existing payload plus header.
      * @param buf_len  In/out: payload length → frame length after prepend.
+     * @param src_mac  Source MAC address (should be the port's own MAC).
      * @return true on success, false if the buffer would overflow.
      */
-    bool AddEthernetHeader(std::uint8_t* buf, unsigned int& buf_len) const;
+    bool AddEthernetHeader(std::uint8_t* buf,
+                           unsigned int& buf_len,
+                           const std::array<std::uint8_t, kMacAddrLen>& src_mac,
+                           std::size_t buf_capacity) const;
 };
 
 }  // namespace details

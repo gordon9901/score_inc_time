@@ -14,6 +14,7 @@
 #include "score/TimeSlave/code/gptp/details/frame_codec.h"
 
 #include <arpa/inet.h>
+#include <array>
 #include <cstring>
 
 namespace score
@@ -38,22 +39,41 @@ int PeerDelayMeasurer::SendRequest(IRawSocket& socket)
     req.ptpHdr.reserved2 = 0;
     req.ptpHdr.sourcePortIdentity.clockIdentity = local_identity_;
     req.ptpHdr.sourcePortIdentity.portNumber = htons(0x0001U);
-    req.ptpHdr.sequenceId = htons(static_cast<std::uint16_t>(seqnum_));
-    req.ptpHdr.controlField = kCtlOther;
+    req.ptpHdr.sequenceId = htons(seqnum_);
+    req.ptpHdr.controlField = static_cast<std::uint8_t>(ControlField::kOther);
     req.ptpHdr.logMessageInterval = 0x7F;
 
-    // Save a copy with host-byte-order sequence ID for later matching
+    // Save a copy with host-byte-order fields for later matching.
+    // portNumber and sequenceId are stored in host byte order so that
+    // memcmp/equality checks in ComputeAndStoreUnlocked() agree with the
+    // host-order values produced by GgtpMessageParser (LoadU16/ntohs).
     {
         std::lock_guard<std::mutex> lk(mutex_);
         req_ = req;
-        req_.ptpHdr.sequenceId = static_cast<std::uint16_t>(seqnum_);
+        req_.ptpHdr.sequenceId = seqnum_;
+        req_.ptpHdr.sourcePortIdentity.portNumber = 0x0001U;  // host byte order
+        req_.sendHardwareTS = TmvT{-1};  // sentinel: TX timestamp pending
+        ++seqnum_;  // uint16_t: wraps naturally at 0xFFFF
     }
-    ++seqnum_;
 
-    auto buf = reinterpret_cast<std::uint8_t*>(&req);
+    // Derive the source MAC from the EUI-64 ClockIdentity (reverse EUI-48→EUI-64
+    // expansion: OUI = id[0..2], vendor = id[5..7]).
+    const std::array<std::uint8_t, kMacAddrLen> src_mac = {local_identity_.id[0],
+                                                            local_identity_.id[1],
+                                                            local_identity_.id[2],
+                                                            local_identity_.id[5],
+                                                            local_identity_.id[6],
+                                                            local_identity_.id[7]};
+
+    // Use a separate stack buffer — never alias the PTPMessage object itself as a
+    // raw frame buffer; AddEthernetHeader() shifts the payload in-place and would
+    // write beyond sizeof(PTPMessage).
+    std::uint8_t buf[2048]{};
     unsigned int len = sizeof(PdelayReqBody);
+    std::memcpy(buf, &req, len);
+
     FrameCodec codec;
-    if (!codec.AddEthernetHeader(buf, len))
+    if (!codec.AddEthernetHeader(buf, len, src_mac, sizeof(buf)))
         return -1;
 
     ::timespec hwts{};
@@ -74,21 +94,33 @@ void PeerDelayMeasurer::OnResponse(const PTPMessage& msg)
 
 void PeerDelayMeasurer::OnResponseFollowUp(const PTPMessage& msg)
 {
-    {
-        std::lock_guard<std::mutex> lk(mutex_);
-        resp_fup_ = msg;
-    }
-    ComputeAndStore();
+
+    std::lock_guard<std::mutex> lk(mutex_);
+    resp_fup_ = msg;
+    ComputeAndStoreUnlocked();
 }
 
-void PeerDelayMeasurer::ComputeAndStore() noexcept
+void PeerDelayMeasurer::ComputeAndStoreUnlocked() noexcept
 {
-    std::lock_guard<std::mutex> lk(mutex_);
-
-    // All three messages must share the same sequence ID
     if (req_.ptpHdr.sequenceId != resp_.ptpHdr.sequenceId)
         return;
     if (resp_.ptpHdr.sequenceId != resp_fup_.ptpHdr.sequenceId)
+        return;
+
+    // Reject if t1 has not been recorded yet (TX timestamp still pending after Send()).
+    // Without this guard, a response arriving in the race window between the first
+    // lock release and the sendHardwareTS assignment would produce a garbage delay.
+    // Sentinel value -1 means "TX timestamp pending"; 0 is a valid timestamp (t=0).
+    if (req_.sendHardwareTS.ns < 0)
+        return;
+
+    if (std::memcmp(&resp_.pdelay_resp.requestingPortIdentity,
+                    &req_.ptpHdr.sourcePortIdentity,
+                    sizeof(PortIdentity)) != 0)
+        return;
+    if (std::memcmp(&resp_fup_.pdelay_resp_fup.requestingPortIdentity,
+                    &req_.ptpHdr.sourcePortIdentity,
+                    sizeof(PortIdentity)) != 0)
         return;
 
     // t1 = HW send timestamp of our Pdelay_Req
@@ -104,6 +136,9 @@ void PeerDelayMeasurer::ComputeAndStore() noexcept
     const TmvT t4 = resp_.recvHardwareTS;
 
     const std::int64_t delay = ((t2.ns - t1.ns) + (t4.ns - t3c.ns)) / 2LL;
+
+    if (delay < 0)
+        return;
 
     PDelayResult r{};
     r.path_delay_ns = delay;

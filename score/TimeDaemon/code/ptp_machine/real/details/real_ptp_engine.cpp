@@ -60,32 +60,7 @@ bool RealPTPEngine::ReadPTPSnapshot(PtpTimeInfo& info)
     if (!result.has_value())
         return false;
 
-    cached_ = result.value();
-
-    const bool time_ok = ReadTimeValueAndStatus(info);
-    const bool pdelay_ok = ReadPDelayMeasurementData(info);
-    const bool sync_ok = ReadSyncMeasurementData(info);
-    return time_ok && pdelay_ok && sync_ok;
-}
-
-bool RealPTPEngine::ReadTimeValueAndStatus(PtpTimeInfo& info) noexcept
-{
-    info.local_time = cached_.local_time;
-    info.ptp_assumed_time = cached_.ptp_assumed_time;
-    info.rate_deviation = cached_.rate_deviation;
-    info.status = cached_.status;
-    return true;
-}
-
-bool RealPTPEngine::ReadPDelayMeasurementData(PtpTimeInfo& info) const noexcept
-{
-    info.pdelay_data = cached_.pdelay_data;
-    return true;
-}
-
-bool RealPTPEngine::ReadSyncMeasurementData(PtpTimeInfo& info) const noexcept
-{
-    info.sync_fup_data = cached_.sync_fup_data;
+    info = result.value();
     return true;
 }
 

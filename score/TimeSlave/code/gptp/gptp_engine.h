@@ -22,13 +22,13 @@
 #include "score/TimeSlave/code/gptp/details/ptp_types.h"
 #include "score/TimeSlave/code/gptp/details/sync_state_machine.h"
 
-#include <pthread.h>
 #include <atomic>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <optional>
 #include <string>
+#include <thread>
 
 namespace score
 {
@@ -88,8 +88,6 @@ class GptpEngine final
     bool ReadPTPSnapshot(score::td::PtpTimeInfo& info);
 
   private:
-    static void* RxThreadEntry(void* arg) noexcept;
-    static void* PdelayThreadEntry(void* arg) noexcept;
     void RxLoop() noexcept;
     void PdelayLoop() noexcept;
 
@@ -110,10 +108,8 @@ class GptpEngine final
     score::td::PtpTimeInfo snapshot_{};
 
     std::atomic<bool> running_{false};
-    pthread_t rx_thread_{};
-    pthread_t pdelay_thread_{};
-    bool rx_started_{false};
-    bool pdelay_started_{false};
+    std::thread rx_thread_;
+    std::thread pdelay_thread_;
 };
 
 }  // namespace details

@@ -13,7 +13,7 @@
 #include "score/TimeSlave/code/gptp/details/frame_codec.h"
 
 #include <arpa/inet.h>
-#include <cstdio>
+#include <array>
 #include <cstring>
 
 namespace score
@@ -26,65 +26,68 @@ namespace details
 namespace
 {
 
-int Str2Mac(const char* s, unsigned char mac[kMacAddrLen]) noexcept
-{
-    unsigned int b[kMacAddrLen]{};
-    if (std::sscanf(s, "%x:%x:%x:%x:%x:%x", &b[0], &b[1], &b[2], &b[3], &b[4], &b[5]) != kMacAddrLen)
-    {
-        return -1;
-    }
-    for (int i = 0; i < kMacAddrLen; ++i)
-        mac[i] = static_cast<unsigned char>(b[i]);
-    return 0;
-}
+constexpr std::array<std::uint8_t, kMacAddrLen> kPtpDstMacBytes = {
+    0x01U, 0x80U, 0xC2U, 0x00U, 0x00U, 0x0EU};
+
+constexpr std::size_t kVlanTciLen = 2U;
 
 }  // namespace
 
 bool FrameCodec::ParseEthernetHeader(const std::uint8_t* frame, int frame_len, int& ptp_offset) const
 {
-    const int kEthHdrLen = static_cast<int>(sizeof(ethhdr));
-    if (frame_len < kEthHdrLen)
+    // Convert to size_t once (after the negative guard) to avoid signed/unsigned
+    // comparisons when mixing frame_len (int) with size constants (std::size_t).
+    if (frame_len <= 0)
+        return false;
+    const std::size_t len = static_cast<std::size_t>(frame_len);
+
+    constexpr std::size_t kEthHdrLen = sizeof(ethhdr);
+    if (len < kEthHdrLen)
         return false;
 
     ethhdr hdr{};
     std::memcpy(&hdr, frame, sizeof(hdr));
 
-    const auto etype = static_cast<unsigned short>(ntohs(hdr.h_proto));
+    const auto etype = static_cast<std::uint16_t>(ntohs(hdr.h_proto));
 
-    if (etype == static_cast<unsigned short>(kEthP8021Q))
+    if (etype == kEthP8021Q)
     {
-        // Skip 4-byte VLAN tag; re-read EtherType
-        if (frame_len < kEthHdrLen + kVlanTagLen + 2)
+        // After the 14-byte ethhdr, the 802.1Q VLAN overhead is:
+        //   offset 14–15: TCI (2 bytes)
+        //   offset 16–17: inner EtherType (2 bytes)   ← read from here
+        //   offset 18+  : PTP payload                 ← ptp_offset
+        if (len < kEthHdrLen + kVlanTagLen + 2U)
             return false;
-        const uint16_t inner_etype_be = *reinterpret_cast<const uint16_t*>(frame + kEthHdrLen + kVlanTagLen);
-        if (ntohs(inner_etype_be) != static_cast<uint16_t>(kEthP1588))
+        std::uint16_t inner_etype_be{};
+        std::memcpy(&inner_etype_be, frame + kEthHdrLen + kVlanTciLen, sizeof(inner_etype_be));
+        if (static_cast<std::uint16_t>(ntohs(inner_etype_be)) != kEthP1588)
             return false;
-        ptp_offset = kEthHdrLen + kVlanTagLen;
+        ptp_offset = static_cast<int>(kEthHdrLen + kVlanTagLen);
         return true;
     }
 
-    if (etype != static_cast<unsigned short>(kEthP1588))
+    if (etype != kEthP1588)
         return false;
 
-    ptp_offset = kEthHdrLen;
+    ptp_offset = static_cast<int>(kEthHdrLen);
     return true;
 }
 
-bool FrameCodec::AddEthernetHeader(std::uint8_t* buf, unsigned int& buf_len) const
+bool FrameCodec::AddEthernetHeader(std::uint8_t* buf,
+                                   unsigned int& buf_len,
+                                   const std::array<std::uint8_t, kMacAddrLen>& src_mac,
+                                   std::size_t buf_capacity) const
 {
-    constexpr unsigned int kMaxFrameSize = 2048U;
     const unsigned int kHdrLen = static_cast<unsigned int>(sizeof(ethhdr));
 
-    if (buf_len + kHdrLen > kMaxFrameSize)
+    if (buf_capacity < kHdrLen || buf_len > static_cast<unsigned int>(buf_capacity) - kHdrLen)
         return false;
 
     std::memmove(buf + kHdrLen, buf, buf_len);
 
     auto* hdr = reinterpret_cast<ethhdr*>(buf);
-    if (Str2Mac(kPtpSrcMac, hdr->h_source) != 0 || Str2Mac(kPtpDstMac, hdr->h_dest) != 0)
-    {
-        return false;
-    }
+    std::memcpy(hdr->h_dest, kPtpDstMacBytes.data(), kMacAddrLen);
+    std::memcpy(hdr->h_source, src_mac.data(), kMacAddrLen);
     hdr->h_proto = htons(static_cast<uint16_t>(kEthP1588));
 
     buf_len += kHdrLen;

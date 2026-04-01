@@ -26,10 +26,10 @@ namespace details
 {
 
 /// Default POSIX shared memory name for the gPTP IPC channel.
-static constexpr char kGptpIpcName[] = "/gptp_ptp_info";
+constexpr char kGptpIpcName[] = "/gptp_ptp_info";
 
 /// Magic number to validate the shared memory region ('GPTP').
-static constexpr std::uint32_t kGptpIpcMagic = 0x47505450U;
+inline constexpr std::uint32_t kGptpIpcMagic = 0x47505450U;
 
 /**
  * @brief Shared memory layout for gPTP IPC (seqlock protocol).
@@ -43,10 +43,10 @@ static constexpr std::uint32_t kGptpIpcMagic = 0x47505450U;
  */
 struct alignas(64) GptpIpcRegion
 {
-    std::uint32_t magic{kGptpIpcMagic};
+    std::atomic<std::uint32_t> magic{kGptpIpcMagic};
     std::atomic<std::uint32_t> seq{0};
     score::td::PtpTimeInfo data{};
-    std::atomic<std::uint32_t> seq_confirm{0};
+    std::atomic<std::uint32_t> seq_confirm{1};
 };
 
 }  // namespace details

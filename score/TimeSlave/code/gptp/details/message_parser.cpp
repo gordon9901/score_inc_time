@@ -15,11 +15,19 @@
 #include <arpa/inet.h>
 #include <cstring>
 
+namespace
+{
+
+inline std::uint64_t ByteSwap64(std::uint64_t v) noexcept
+{
 #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
-#define BSWAP64(x) __builtin_bswap64(x)
+    return __builtin_bswap64(v);
 #else
-#define BSWAP64(x) (x)
+    return v;
 #endif
+}
+
+}  // namespace
 
 namespace score
 {
@@ -49,7 +57,7 @@ std::uint64_t LoadBe64(const std::uint8_t* p) noexcept
 {
     std::uint64_t v{};
     std::memcpy(&v, p, sizeof(v));
-    return BSWAP64(v);
+    return ByteSwap64(v);
 }
 
 Timestamp LoadTimestamp(const std::uint8_t* p) noexcept
@@ -66,6 +74,17 @@ Timestamp LoadTimestamp(const std::uint8_t* p) noexcept
 bool GptpMessageParser::Parse(const std::uint8_t* payload, std::size_t payload_len, PTPMessage& msg) const
 {
     if (payload == nullptr || payload_len < sizeof(PTPHeader))
+        return false;
+
+    const std::uint16_t declared_len =
+        static_cast<std::uint16_t>((static_cast<std::uint16_t>(payload[2]) << 8U) | payload[3]);
+    if (declared_len < sizeof(PTPHeader) || static_cast<std::size_t>(declared_len) > payload_len)
+        return false;
+
+    // Validate transportSpecific nibble (must be 0x1 for 802.1AS) and PTP version.
+    if ((payload[0] & 0xF0U) != kPtpTransportSpecific)
+        return false;
+    if ((payload[1] & 0x0FU) != kPtpVersion)
         return false;
 
     msg.ptpHdr.tsmt = payload[0];
@@ -95,12 +114,33 @@ bool GptpMessageParser::Parse(const std::uint8_t* payload, std::size_t payload_l
 
         case kPtpMsgtypePdelayResp:
             if (payload_len >= kBodyOffset + sizeof(Timestamp))
-                msg.pdelay_resp.responseOriginTimestamp = LoadTimestamp(payload + kBodyOffset);
+            {
+                msg.pdelay_resp.requestReceiptTimestamp = LoadTimestamp(payload + kBodyOffset);
+                // Also parse requestingPortIdentity (8-byte ClockIdentity + 2-byte portNumber)
+                // so that ComputeAndStoreUnlocked() can verify the response is addressed to us.
+                constexpr std::size_t kPidOffset = kBodyOffset + sizeof(Timestamp);  // = 44
+                if (payload_len >= kPidOffset + 10U)
+                {
+                    std::memcpy(msg.pdelay_resp.requestingPortIdentity.clockIdentity.id,
+                                payload + kPidOffset, 8);
+                    msg.pdelay_resp.requestingPortIdentity.portNumber = LoadU16(payload + kPidOffset + 8U);
+                }
+            }
             break;
 
         case kPtpMsgtypePdelayRespFollowUp:
             if (payload_len >= kBodyOffset + sizeof(Timestamp))
+            {
                 msg.pdelay_resp_fup.responseOriginReceiptTimestamp = LoadTimestamp(payload + kBodyOffset);
+                constexpr std::size_t kPidOffset = kBodyOffset + sizeof(Timestamp);  // = 44
+                if (payload_len >= kPidOffset + 10U)
+                {
+                    std::memcpy(msg.pdelay_resp_fup.requestingPortIdentity.clockIdentity.id,
+                                payload + kPidOffset, 8);
+                    msg.pdelay_resp_fup.requestingPortIdentity.portNumber =
+                        LoadU16(payload + kPidOffset + 8U);
+                }
+            }
             break;
 
         default:

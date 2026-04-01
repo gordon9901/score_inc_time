@@ -211,66 +211,6 @@ TEST_F(RealPTPEngineTest, ReadPTPSnapshot_CopiesPDelayDataCorrectly)
     EXPECT_EQ(result.pdelay_data.resp_clock_identity, expected.pdelay_data.resp_clock_identity);
 }
 
-// ── Individual sub-methods (called after ReadPTPSnapshot populates cache) ─────
-
-TEST_F(RealPTPEngineTest, ReadTimeValueAndStatus_FromCachedData_AlwaysReturnsTrue)
-{
-    ASSERT_TRUE(pub_.Init(name_));
-    pub_.Publish(MakeTestInfo());
-    ASSERT_TRUE(engine_->Initialize());
-
-    PtpTimeInfo snap{};
-    ASSERT_TRUE(engine_->ReadPTPSnapshot(snap));
-
-    // Call again on a fresh struct — should use the cached data.
-    PtpTimeInfo result{};
-    EXPECT_TRUE(engine_->ReadTimeValueAndStatus(result));
-    EXPECT_EQ(result.ptp_assumed_time, snap.ptp_assumed_time);
-    EXPECT_DOUBLE_EQ(result.rate_deviation, snap.rate_deviation);
-    EXPECT_EQ(result.status.is_synchronized, snap.status.is_synchronized);
-}
-
-TEST_F(RealPTPEngineTest, ReadPDelayMeasurementData_FromCachedData_AlwaysReturnsTrue)
-{
-    ASSERT_TRUE(pub_.Init(name_));
-    pub_.Publish(MakeTestInfo());
-    ASSERT_TRUE(engine_->Initialize());
-
-    PtpTimeInfo snap{};
-    ASSERT_TRUE(engine_->ReadPTPSnapshot(snap));
-
-    PtpTimeInfo result{};
-    EXPECT_TRUE(engine_->ReadPDelayMeasurementData(result));
-    EXPECT_EQ(result.pdelay_data.pdelay, snap.pdelay_data.pdelay);
-}
-
-TEST_F(RealPTPEngineTest, ReadSyncMeasurementData_FromCachedData_AlwaysReturnsTrue)
-{
-    ASSERT_TRUE(pub_.Init(name_));
-    pub_.Publish(MakeTestInfo());
-    ASSERT_TRUE(engine_->Initialize());
-
-    PtpTimeInfo snap{};
-    ASSERT_TRUE(engine_->ReadPTPSnapshot(snap));
-
-    PtpTimeInfo result{};
-    EXPECT_TRUE(engine_->ReadSyncMeasurementData(result));
-    EXPECT_EQ(result.sync_fup_data.sequence_id, snap.sync_fup_data.sequence_id);
-}
-
-// Sub-methods on default-constructed cache (before any snapshot) return true
-// with zeroed data.
-TEST_F(RealPTPEngineTest, SubMethods_BeforeSnapshot_ReturnTrueWithZeroData)
-{
-    ASSERT_TRUE(pub_.Init(name_));
-    ASSERT_TRUE(engine_->Initialize());
-
-    PtpTimeInfo result{};
-    EXPECT_TRUE(engine_->ReadTimeValueAndStatus(result));
-    EXPECT_TRUE(engine_->ReadPDelayMeasurementData(result));
-    EXPECT_TRUE(engine_->ReadSyncMeasurementData(result));
-    EXPECT_EQ(result.ptp_assumed_time, std::chrono::nanoseconds{0});
-}
 
 }  // namespace details
 }  // namespace td

@@ -16,6 +16,7 @@
 #include "score/TimeSlave/code/gptp/details/i_raw_socket.h"
 
 #include <time.h>
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -75,11 +76,11 @@ class RawSocket : public IRawSocket
     /// Return the underlying file descriptor (for advanced use / polling).
     int GetFd() const override
     {
-        return fd_;
+        return fd_.load(std::memory_order_relaxed);
     }
 
   private:
-    int fd_{-1};
+    std::atomic<int> fd_{-1};
     std::string iface_{};
 };
 

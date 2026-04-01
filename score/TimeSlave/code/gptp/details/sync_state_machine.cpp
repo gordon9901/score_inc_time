@@ -11,8 +11,7 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 #include "score/TimeSlave/code/gptp/details/sync_state_machine.h"
-
-#include <time.h>
+#include "score/TimeSlave/code/gptp/details/clock_util.h"
 
 namespace score
 {
@@ -21,20 +20,10 @@ namespace ts
 namespace details
 {
 
-namespace
-{
-
-std::int64_t MonoNs() noexcept
-{
-    ::timespec ts{};
-    ::clock_gettime(CLOCK_MONOTONIC, &ts);
-    return static_cast<std::int64_t>(ts.tv_sec) * kNsPerSec + ts.tv_nsec;
-}
-
-}  // namespace
 
 SyncStateMachine::SyncStateMachine(std::int64_t jump_future_threshold_ns) noexcept
-    : jump_future_threshold_ns_{jump_future_threshold_ns}
+    : jump_future_threshold_ns_{jump_future_threshold_ns},
+      created_mono_ns_{MonoNs()}
 {
 }
 
@@ -100,7 +89,10 @@ bool SyncStateMachine::IsTimeout(std::int64_t mono_now_ns, std::int64_t timeout_
         return false;
     const std::int64_t last = last_sync_mono_ns_.load(std::memory_order_acquire);
     if (last == 0)
-        return false;  // never synchronized yet — not a "timeout"
+    {
+        const std::int64_t start = created_mono_ns_.load(std::memory_order_relaxed);
+        return (mono_now_ns - start) > timeout_ns;
+    }
     return (mono_now_ns - last) > timeout_ns;
 }
 
@@ -117,7 +109,7 @@ SyncResult SyncStateMachine::BuildResult(const PTPMessage& sync, const PTPMessag
     r.master_ns = master_ns;
     r.offset_ns = offset_ns;
 
-    if (last_master_ns_ != 0)
+    if (has_previous_master_)
     {
         const std::int64_t delta = master_ns - last_master_ns_;
         if (delta < 0)
@@ -126,12 +118,16 @@ SyncResult SyncStateMachine::BuildResult(const PTPMessage& sync, const PTPMessag
             r.is_time_jump_future = true;
     }
 
+    const auto to_u64 = [](std::int64_t v) noexcept -> std::uint64_t {
+        return v >= 0 ? static_cast<std::uint64_t>(v) : 0U;
+    };
+
     score::td::SyncFupData& d = r.sync_fup_data;
-    d.precise_origin_timestamp = static_cast<std::uint64_t>(fup_ts.ns);
-    d.reference_global_timestamp = static_cast<std::uint64_t>(master_ns);
-    d.reference_local_timestamp = static_cast<std::uint64_t>(sync.recvHardwareTS.ns);
-    d.sync_ingress_timestamp = static_cast<std::uint64_t>(sync.recvHardwareTS.ns);
-    d.correction_field = static_cast<std::uint64_t>(sync.ptpHdr.correctionField);
+    d.precise_origin_timestamp = to_u64(fup_ts.ns);
+    d.reference_global_timestamp = to_u64(master_ns);
+    d.reference_local_timestamp = to_u64(sync.recvHardwareTS.ns);
+    d.sync_ingress_timestamp = to_u64(sync.recvHardwareTS.ns);
+    d.correction_field = to_u64(sync.ptpHdr.correctionField);
     d.sequence_id = fup.ptpHdr.sequenceId;
     d.pdelay = 0U;  // filled by GptpEngine from IPeerDelayMeasurer
     d.port_number = sync.ptpHdr.sourcePortIdentity.portNumber;
@@ -142,7 +138,10 @@ SyncResult SyncStateMachine::BuildResult(const PTPMessage& sync, const PTPMessag
     {
         const std::int64_t slave_interval = sync.recvHardwareTS.ns - prev_slave_rx_ns_;
         const std::int64_t master_interval = master_ns - prev_master_origin_ns_;
-        if (master_interval > 0)
+        // Both intervals must be strictly positive: a non-positive slave_interval
+        // indicates a HW timestamp rollback or clock step, which would produce a
+        // nonsensical (negative or zero) rate ratio published to PtpTimeInfo.
+        if (master_interval > 0 && slave_interval > 0)
         {
             neighbor_rate_ratio_ = static_cast<double>(slave_interval) / static_cast<double>(master_interval);
         }
@@ -151,6 +150,7 @@ SyncResult SyncStateMachine::BuildResult(const PTPMessage& sync, const PTPMessag
     prev_master_origin_ns_ = master_ns;
 
     last_master_ns_ = master_ns;
+    has_previous_master_ = true;
 
     return r;
 }

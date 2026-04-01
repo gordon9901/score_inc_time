@@ -15,6 +15,7 @@
 #include <gtest/gtest.h>
 
 #include <arpa/inet.h>
+#include <array>
 #include <cstring>
 
 namespace score
@@ -74,15 +75,16 @@ TEST_F(FrameCodecParseTest, Eth1588_Valid_ReturnsTrueAndOffset14)
 
 TEST_F(FrameCodecParseTest, Vlan8021Q_ValidPtpInner_ReturnsTrueAndOffset18)
 {
-    // VLAN-tagged: ethhdr(14) + VLAN tag(4) + inner EtherType(2) + payload
-    // Minimum valid length = 20; inner EtherType is at bytes [18..19]
+    // IEEE 802.1Q layout: ethhdr(14) | TCI(2) | inner EtherType(2) | payload
+    //   offset 14-15: TCI
+    //   offset 16-17: inner EtherType  ← written here
+    //   offset 18+  : PTP payload      ← ptp_offset == 18 == 14 + kVlanTagLen
     auto buf = MakeEthFrame(static_cast<std::uint16_t>(kEthP8021Q), 60);
-    // Inner EtherType = kEthP1588 at offset 14 + kVlanTagLen = 18
     const std::uint16_t inner_be = htons(static_cast<std::uint16_t>(kEthP1588));
-    std::memcpy(&buf[14 + kVlanTagLen], &inner_be, 2);
+    std::memcpy(&buf[14 + 2], &inner_be, 2);  // inner EtherType at offset 16
     int offset = -1;
     ASSERT_TRUE(codec_.ParseEthernetHeader(buf.data(), 60, offset));
-    EXPECT_EQ(offset, 14 + kVlanTagLen);
+    EXPECT_EQ(offset, 14 + kVlanTagLen);  // PTP payload at offset 18
 }
 
 TEST_F(FrameCodecParseTest, Vlan8021Q_TooShortForInnerType_ReturnsFalse)
@@ -122,7 +124,8 @@ TEST_F(FrameCodecParseTest, AddEthernetHeader_NormalPayload_ReturnsTrueAndIncrem
     buf[1] = 0xAD;
 
     unsigned int len = kPayloadLen;
-    ASSERT_TRUE(codec_.AddEthernetHeader(buf, len));
+    const std::array<std::uint8_t, kMacAddrLen> src_mac = {0x02U, 0x00U, 0x00U, 0xFFU, 0x00U, 0x11U};
+    ASSERT_TRUE(codec_.AddEthernetHeader(buf, len, src_mac, sizeof(buf)));
     EXPECT_EQ(len, kPayloadLen + 14U);
 
     // Payload was shifted right by 14 bytes
@@ -138,10 +141,11 @@ TEST_F(FrameCodecParseTest, AddEthernetHeader_NormalPayload_ReturnsTrueAndIncrem
 
 TEST_F(FrameCodecParseTest, AddEthernetHeader_PayloadTooLarge_ReturnsFalse)
 {
-    constexpr unsigned int kTooBig = 2048U;  // buf_len + 14 > 2048
+    constexpr unsigned int kTooBig = 2048U;  // buf_len + 14 > capacity
     std::uint8_t buf[4096] = {};
     unsigned int len = kTooBig;
-    EXPECT_FALSE(codec_.AddEthernetHeader(buf, len));
+    const std::array<std::uint8_t, kMacAddrLen> src_mac = {0x02U, 0x00U, 0x00U, 0xFFU, 0x00U, 0x11U};
+    EXPECT_FALSE(codec_.AddEthernetHeader(buf, len, src_mac, kTooBig));
 }
 
 }  // namespace details

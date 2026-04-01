@@ -201,8 +201,9 @@ TEST_F(SyncStateMachineTest, NeighborRateRatio_AfterTwoPairs_Computed)
 
 TEST_F(SyncStateMachineTest, IsTimeout_BeforeFirstSync_ReturnsFalse)
 {
-    // last_sync_mono_ns_ == 0; should never be considered a timeout
-    EXPECT_FALSE(ssm_.IsTimeout(std::numeric_limits<std::int64_t>::max(), 1LL));
+    // Before first sync, IsTimeout uses the object creation time as baseline.
+    // Passing now=0 gives (0 - created_mono_ns_) which is negative → not > threshold.
+    EXPECT_FALSE(ssm_.IsTimeout(0LL, 1LL));
 }
 
 TEST_F(SyncStateMachineTest, IsTimeout_AfterSuccessfulPair_WithLargeNow_ReturnsTrue)

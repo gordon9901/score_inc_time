@@ -62,9 +62,14 @@ class FakeSocket final : public IRawSocket
         cv_.notify_one();
     }
 
+    void SetOpenOk(bool v)
+    {
+        open_ok_ = v;
+    }
+
     bool Open(const std::string&) override
     {
-        return true;
+        return open_ok_;
     }
     bool EnableHwTimestamping() override
     {
@@ -119,6 +124,7 @@ class FakeSocket final : public IRawSocket
     std::condition_variable cv_;
     bool closed_{false};
     bool hw_ts_ok_{true};
+    bool open_ok_{true};
 };
 
 // ── FakeIdentity ──────────────────────────────────────────────────────────────
@@ -510,6 +516,86 @@ TEST(GptpEngineRealSocketTest, Initialize_NonExistentInterface_ReturnsFalse)
     GptpEngine eng{opts, std::make_unique<FakeClock>()};
     EXPECT_FALSE(eng.Initialize());
     EXPECT_TRUE(eng.Deinitialize());
+}
+
+// ── Socket-open-fail path (lines 87–90 of gptp_engine.cpp) ───────────────────
+
+TEST(GptpEngineSocketFailTest, Initialize_SocketOpenFails_ReturnsFalse)
+{
+    auto sock = std::make_unique<FakeSocket>();
+    auto identity = std::make_unique<FakeIdentity>();
+    sock->SetOpenOk(false);
+    GptpEngine eng{FastOptions(), std::make_unique<FakeClock>(), std::move(sock), std::move(identity)};
+    EXPECT_FALSE(eng.Initialize());
+    EXPECT_TRUE(eng.Deinitialize());
+}
+
+// ── Time-jump detection (UpdateSnapshot lines 301–303) ───────────────────────
+
+namespace
+{
+
+bool WaitForFlag(GptpEngine& eng, bool (*pred)(const score::td::PtpTimeInfo&), int max_ms = 1000)
+{
+    for (int i = 0; i < max_ms / 10; ++i)
+    {
+        score::td::PtpTimeInfo info{};
+        eng.ReadPTPSnapshot(info);
+        if (pred(info))
+            return true;
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+    return false;
+}
+
+}  // namespace
+
+TEST_F(GptpEngineFakeTest, HandlePacket_TwoSyncFup_TimeJumpFuture_Detected)
+{
+    ASSERT_TRUE(engine_->Initialize());
+
+    // Pair 1: master_ns ≈ 2 s
+    ::timespec hwts1{1, 0};
+    socket_raw_->Push(MakeSyncFrame(1U), hwts1);
+    socket_raw_->Push(MakeFollowUpFrame(1U, /*sec=*/2U, /*ns=*/0U));
+
+    // Pair 2: master_ns ≈ 3 s (delta = 1 s > 500 ms threshold → is_time_jump_future)
+    ::timespec hwts2{2, 0};
+    socket_raw_->Push(MakeSyncFrame(2U), hwts2);
+    socket_raw_->Push(MakeFollowUpFrame(2U, /*sec=*/3U, /*ns=*/0U));
+
+    const bool got =
+        WaitForFlag(*engine_, [](const score::td::PtpTimeInfo& i) { return i.status.is_time_jump_future; });
+    EXPECT_TRUE(got);
+
+    score::td::PtpTimeInfo info{};
+    ASSERT_TRUE(engine_->ReadPTPSnapshot(info));
+    EXPECT_TRUE(info.status.is_time_jump_future);
+    EXPECT_FALSE(info.status.is_correct);
+}
+
+TEST_F(GptpEngineFakeTest, HandlePacket_TwoSyncFup_TimeJumpPast_Detected)
+{
+    ASSERT_TRUE(engine_->Initialize());
+
+    // Pair 1: master_ns ≈ 3 s
+    ::timespec hwts1{1, 0};
+    socket_raw_->Push(MakeSyncFrame(1U), hwts1);
+    socket_raw_->Push(MakeFollowUpFrame(1U, /*sec=*/3U, /*ns=*/0U));
+
+    // Pair 2: master_ns ≈ 2 s (delta < 0 → is_time_jump_past)
+    ::timespec hwts2{2, 0};
+    socket_raw_->Push(MakeSyncFrame(2U), hwts2);
+    socket_raw_->Push(MakeFollowUpFrame(2U, /*sec=*/2U, /*ns=*/0U));
+
+    const bool got =
+        WaitForFlag(*engine_, [](const score::td::PtpTimeInfo& i) { return i.status.is_time_jump_past; });
+    EXPECT_TRUE(got);
+
+    score::td::PtpTimeInfo info{};
+    ASSERT_TRUE(engine_->ReadPTPSnapshot(info));
+    EXPECT_TRUE(info.status.is_time_jump_past);
+    EXPECT_FALSE(info.status.is_correct);
 }
 
 }  // namespace details

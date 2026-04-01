@@ -36,13 +36,13 @@ namespace ts
 class TimeSlave final : public score::mw::lifecycle::Application
 {
   public:
-    explicit TimeSlave();
+    TimeSlave();
     ~TimeSlave() noexcept override = default;
 
-    TimeSlave(TimeSlave&&) noexcept = delete;
-    TimeSlave(const TimeSlave&) noexcept = delete;
-    TimeSlave& operator=(TimeSlave&&) & noexcept = delete;
-    TimeSlave& operator=(const TimeSlave&) & noexcept = delete;
+    TimeSlave(TimeSlave&&) = delete;
+    TimeSlave(const TimeSlave&) = delete;
+    TimeSlave& operator=(TimeSlave&&) & = delete;
+    TimeSlave& operator=(const TimeSlave&) & = delete;
 
     std::int32_t Initialize(const score::mw::lifecycle::ApplicationContext& context) override;
     std::int32_t Run(const score::cpp::stop_token& token) override;

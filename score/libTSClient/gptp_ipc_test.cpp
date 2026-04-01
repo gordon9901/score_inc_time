@@ -118,6 +118,13 @@ TEST_F(GptpIpcPublisherTest, Destroy_WithoutInit_DoesNotCrash)
     EXPECT_NO_THROW(pub_.Destroy());
 }
 
+TEST_F(GptpIpcPublisherTest, Init_CalledTwice_ReturnsTrueOnSecondCall)
+{
+    // region_ != nullptr after first Init → second call returns true immediately.
+    ASSERT_TRUE(pub_.Init(UniqueShmName()));
+    EXPECT_TRUE(pub_.Init(UniqueShmName()));
+}
+
 // ── GptpIpcReceiver ───────────────────────────────────────────────────────────
 
 class GptpIpcReceiverTest : public ::testing::Test
@@ -152,6 +159,31 @@ TEST_F(GptpIpcReceiverTest, Receive_WithoutInit_ReturnsNullopt)
     EXPECT_FALSE(rx_.Receive().has_value());
 }
 
+TEST_F(GptpIpcReceiverTest, Init_CalledTwice_ReturnsTrueOnSecondCall)
+{
+    // region_ != nullptr after first Init → second call returns true immediately.
+    GptpIpcPublisher pub;
+    const std::string name = UniqueShmName();
+    ASSERT_TRUE(pub.Init(name));
+    ASSERT_TRUE(rx_.Init(name));
+    EXPECT_TRUE(rx_.Init(name));
+    pub.Destroy();
+}
+
+TEST_F(GptpIpcReceiverTest, Init_TooSmallShm_ReturnsFalse)
+{
+    // Create a shm segment smaller than GptpIpcRegion so the fstat size check fails.
+    const std::string name = UniqueShmName();
+    const int fd = ::shm_open(name.c_str(), O_CREAT | O_RDWR, 0600);
+    ASSERT_GE(fd, 0);
+    ASSERT_EQ(::ftruncate(fd, 1), 0);
+    ::close(fd);
+
+    EXPECT_FALSE(rx_.Init(name));
+
+    ::shm_unlink(name.c_str());
+}
+
 // ── Publisher + Receiver roundtrip ────────────────────────────────────────────
 
 class GptpIpcRoundtripTest : public ::testing::Test
@@ -178,14 +210,14 @@ TEST_F(GptpIpcRoundtripTest, ReceiverInit_AfterPublisherInit_ReturnsTrue)
     EXPECT_TRUE(rx_.Init(name_));
 }
 
-TEST_F(GptpIpcRoundtripTest, ReceiverReceive_BeforeAnyPublish_ReturnsDefaultData)
+TEST_F(GptpIpcRoundtripTest, ReceiverReceive_BeforeAnyPublish_ReturnsNullopt)
 {
     ASSERT_TRUE(pub_.Init(name_));
     ASSERT_TRUE(rx_.Init(name_));
-    // seq == seq_confirm == 0: both even and equal → seqlock considers readable.
-    auto result = rx_.Receive();
-    ASSERT_TRUE(result.has_value());
-    EXPECT_EQ(result->ptp_assumed_time, std::chrono::nanoseconds{0});
+    // seq_confirm is initialised to 1 (≠ seq=0) by GptpIpcRegion's constructor,
+    // so the seqlock always mismatches before the first Publish() call.
+    // Receive() must exhaust its retries and return std::nullopt.
+    EXPECT_FALSE(rx_.Receive().has_value());
 }
 
 TEST_F(GptpIpcRoundtripTest, PublishReceive_BasicFields_RoundtripCorrectly)

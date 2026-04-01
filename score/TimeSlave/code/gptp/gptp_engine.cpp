@@ -11,13 +11,13 @@
  * SPDX-License-Identifier: Apache-2.0
  ********************************************************************************/
 #include "score/TimeSlave/code/gptp/gptp_engine.h"
+#include "score/TimeSlave/code/gptp/details/clock_util.h"
 #include "score/TimeSlave/code/gptp/details/network_identity.h"
 #include "score/TimeSlave/code/gptp/details/raw_socket.h"
 
 #include "score/TimeDaemon/code/common/logging_contexts.h"
 #include "score/mw/log/logging.h"
 
-#include <time.h>
 #include <cstring>
 
 namespace score
@@ -32,13 +32,6 @@ namespace
 
 constexpr int kRxTimeoutMs = 100;  // poll timeout; keeps RxLoop responsive to shutdown
 constexpr int kRxBufferSize = 2048;
-
-std::int64_t MonoNs() noexcept
-{
-    ::timespec ts{};
-    ::clock_gettime(CLOCK_MONOTONIC, &ts);
-    return static_cast<std::int64_t>(ts.tv_sec) * 1'000'000'000LL + ts.tv_nsec;
-}
 
 }  // namespace
 
@@ -72,7 +65,7 @@ GptpEngine::GptpEngine(GptpEngineOptions opts,
 
 GptpEngine::~GptpEngine() noexcept
 {
-    (void)Deinitialize();
+    Deinitialize();
 }
 
 bool GptpEngine::Initialize()
@@ -104,22 +97,28 @@ bool GptpEngine::Initialize()
 
     running_.store(true, std::memory_order_release);
 
-    if (::pthread_create(&rx_thread_, nullptr, &RxThreadEntry, this) != 0)
+    try
     {
-        score::mw::log::LogError(score::td::kGPtpMachineContext) << "GptpEngine: failed to create RxThread";
+        rx_thread_ = std::thread([this]() noexcept { RxLoop(); });
+    }
+    catch (const std::system_error& e)
+    {
+        score::mw::log::LogError(score::td::kGPtpMachineContext) << "GptpEngine: failed to create RxThread: " << e.what();
         running_.store(false, std::memory_order_release);
         socket_->Close();
         return false;
     }
-    rx_started_ = true;
 
-    if (::pthread_create(&pdelay_thread_, nullptr, &PdelayThreadEntry, this) != 0)
+    try
     {
-        score::mw::log::LogError(score::td::kGPtpMachineContext) << "GptpEngine: failed to create PdelayThread";
-        (void)Deinitialize();
+        pdelay_thread_ = std::thread([this]() noexcept { PdelayLoop(); });
+    }
+    catch (const std::system_error& e)
+    {
+        score::mw::log::LogError(score::td::kGPtpMachineContext) << "GptpEngine: failed to create PdelayThread: " << e.what();
+        Deinitialize();
         return false;
     }
-    pdelay_started_ = true;
 
     score::mw::log::LogInfo(score::td::kGPtpMachineContext) << "GptpEngine initialized on " << opts_.iface_name;
     return true;
@@ -129,19 +128,13 @@ bool GptpEngine::Deinitialize()
 {
     running_.store(false, std::memory_order_release);
 
-    // Close the socket first so that the RxThread's poll() unblocks
+    // Close the socket first so that the RxThread's poll() unblocks.
     socket_->Close();
 
-    if (rx_started_)
-    {
-        ::pthread_join(rx_thread_, nullptr);
-        rx_started_ = false;
-    }
-    if (pdelay_started_)
-    {
-        ::pthread_join(pdelay_thread_, nullptr);
-        pdelay_started_ = false;
-    }
+    if (rx_thread_.joinable())
+        rx_thread_.join();
+    if (pdelay_thread_.joinable())
+        pdelay_thread_.join();
 
     score::mw::log::LogInfo(score::td::kGPtpMachineContext) << "GptpEngine deinitialized";
     return true;
@@ -155,9 +148,8 @@ bool GptpEngine::ReadPTPSnapshot(score::td::PtpTimeInfo& info)
     const std::int64_t mono_now = MonoNs();
     const std::int64_t timeout_ns = static_cast<std::int64_t>(opts_.sync_timeout_ms) * 1'000'000LL;
 
-    const bool timed_out = sync_sm_.IsTimeout(mono_now, timeout_ns);
-
     std::lock_guard<std::mutex> lk(snapshot_mutex_);
+    const bool timed_out = sync_sm_.IsTimeout(mono_now, timeout_ns);
     snapshot_.local_time = local_clock_->Now();
     if (timed_out)
     {
@@ -167,20 +159,6 @@ bool GptpEngine::ReadPTPSnapshot(score::td::PtpTimeInfo& info)
     }
     info = snapshot_;
     return true;
-}
-
-void* GptpEngine::RxThreadEntry(void* arg) noexcept
-{
-    if (arg != nullptr)
-        static_cast<GptpEngine*>(arg)->RxLoop();
-    return nullptr;
-}
-
-void* GptpEngine::PdelayThreadEntry(void* arg) noexcept
-{
-    if (arg != nullptr)
-        static_cast<GptpEngine*>(arg)->PdelayLoop();
-    return nullptr;
 }
 
 void GptpEngine::RxLoop() noexcept
@@ -201,7 +179,12 @@ void GptpEngine::RxLoop() noexcept
 void GptpEngine::PdelayLoop() noexcept
 {
     ::timespec next{};
-    ::clock_gettime(CLOCK_MONOTONIC, &next);
+    if (::clock_gettime(CLOCK_MONOTONIC, &next) != 0)
+    {
+        score::mw::log::LogError(score::td::kGPtpMachineContext)
+            << "GptpEngine: clock_gettime failed in PdelayLoop, thread exiting";
+        return;
+    }
     // Configurable warm-up before first Pdelay_Req (default 2 s)
     const std::int64_t warmup_ns = static_cast<std::int64_t>(opts_.pdelay_warmup_ms) * 1'000'000LL;
     const std::int64_t next_warmup_ns =
@@ -214,7 +197,20 @@ void GptpEngine::PdelayLoop() noexcept
 
     while (running_.load(std::memory_order_acquire))
     {
-        ::clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &next, nullptr);
+        const std::int64_t target_ns =
+            static_cast<std::int64_t>(next.tv_sec) * 1'000'000'000LL + next.tv_nsec;
+
+        while (running_.load(std::memory_order_acquire))
+        {
+            const std::int64_t remaining = target_ns - MonoNs();
+            if (remaining <= 0)
+                break;
+            constexpr std::int64_t kSliceNs = 50'000'000LL;
+            const std::int64_t sleep_ns = remaining < kSliceNs ? remaining : kSliceNs;
+            const ::timespec slice{0, static_cast<long>(sleep_ns)};
+            ::clock_nanosleep(CLOCK_MONOTONIC, 0, &slice, nullptr);
+        }
+
         if (!running_.load(std::memory_order_acquire))
             break;
 
@@ -223,8 +219,7 @@ void GptpEngine::PdelayLoop() noexcept
             (void)pdelay_->SendRequest(*socket_);
         }
 
-        const std::int64_t next_ns =
-            static_cast<std::int64_t>(next.tv_sec) * 1'000'000'000LL + next.tv_nsec + interval_ns;
+        const std::int64_t next_ns = target_ns + interval_ns;
         next.tv_sec = static_cast<time_t>(next_ns / 1'000'000'000LL);
         next.tv_nsec = static_cast<long>(next_ns % 1'000'000'000LL);
     }
@@ -276,7 +271,7 @@ void GptpEngine::HandlePacket(const std::uint8_t* frame, int len, const ::timesp
 
         case kPtpMsgtypePdelayResp:
             msg.recvHardwareTS = hw_ts;
-            msg.parseMessageTs = TimestampToTmv(msg.pdelay_resp.responseOriginTimestamp);
+            msg.parseMessageTs = TimestampToTmv(msg.pdelay_resp.requestReceiptTimestamp);
             if (pdelay_)
                 pdelay_->OnResponse(msg);
             break;

@@ -39,28 +39,16 @@ class RealPTPEngine final
     RealPTPEngine(RealPTPEngine&&) = delete;
     RealPTPEngine& operator=(RealPTPEngine&&) = delete;
 
-    /// Open and map the IPC channel.
-    /// @return true on success.
     bool Initialize();
 
-    /// Unmap the IPC channel.
-    /// @return true (always succeeds).
     bool Deinitialize();
 
-    /// Read a fresh snapshot from the IPC channel and populate @p info.
-    /// Delegates to ReadTimeValueAndStatus, ReadPDelayMeasurementData,
-    /// and ReadSyncMeasurementData.
     bool ReadPTPSnapshot(PtpTimeInfo& info);
-
-    bool ReadTimeValueAndStatus(PtpTimeInfo& info) noexcept;
-    bool ReadPDelayMeasurementData(PtpTimeInfo& info) const noexcept;
-    bool ReadSyncMeasurementData(PtpTimeInfo& info) const noexcept;
 
   private:
     std::string ipc_name_;
     score::ts::details::GptpIpcReceiver receiver_;
     bool initialized_{false};
-    PtpTimeInfo cached_{};
 };
 
 }  // namespace details

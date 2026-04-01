@@ -18,6 +18,7 @@
 #include <syscall.h>
 #include <unistd.h>
 #include <cmath>
+#include <cstdlib>
 
 namespace score
 {
@@ -37,11 +38,9 @@ int phc_clock_adjtime(clockid_t clk_id, struct timex* tx)
 }
 
 // Construct a clockid from a PHC file descriptor (kernel convention).
-// See linux/include/uapi/linux/time.h
 clockid_t phc_fd_to_clockid(int fd)
 {
-    // NOLINTNEXTLINE(hicpp-signed-bitwise)
-    return static_cast<clockid_t>(~fd << 3 | 3);
+    return static_cast<clockid_t>((~static_cast<unsigned int>(fd) << 3U) | 3U);
 }
 
 }  // namespace
@@ -54,7 +53,7 @@ PhcAdjuster::PhcAdjuster(PhcConfig cfg) : cfg_{std::move(cfg)}
     }
 }
 
-PhcAdjuster::~PhcAdjuster()
+PhcAdjuster::~PhcAdjuster() noexcept
 {
     if (phc_fd_ >= 0)
     {
@@ -94,12 +93,14 @@ void PhcAdjuster::AdjustFrequency(double rate_ratio)
     if (!cfg_.enabled || phc_fd_ < 0)
         return;
 
-    // Convert rate_ratio to ppb offset from 1.0, then to scaled ppm for kernel
-    // rate_ratio = slave_interval / master_interval
-    // ppb = (rate_ratio - 1.0) * 1e9
-    // kernel expects freq in units of 2^-16 ppm = (ppb / 1000) * 65536
+    if (!std::isfinite(rate_ratio) || rate_ratio < 0.5 || rate_ratio > 2.0)
+        return;
+
     const double ppb = (rate_ratio - 1.0) * 1e9;
-    const long scaled_ppm = static_cast<long>(ppb / 1000.0 * 65536.0);
+    const double raw_scaled = ppb / 1000.0 * 65536.0;
+    constexpr double kMaxScaled = 33'554'432.0;
+    const double clamped = raw_scaled < -kMaxScaled ? -kMaxScaled : (raw_scaled > kMaxScaled ? kMaxScaled : raw_scaled);
+    const long scaled_ppm = static_cast<long>(clamped);
 
     struct timex tx
     {

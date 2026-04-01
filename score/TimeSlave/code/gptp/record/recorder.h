@@ -13,6 +13,7 @@
 #ifndef SCORE_TIMESLAVE_CODE_GPTP_RECORD_RECORDER_H
 #define SCORE_TIMESLAVE_CODE_GPTP_RECORD_RECORDER_H
 
+#include <atomic>
 #include <cstdint>
 #include <fstream>
 #include <mutex>
@@ -60,6 +61,7 @@ class Recorder final
         bool enabled = false;
         std::string file_path = "/var/log/gptp_record.csv";
         std::int64_t offset_threshold_ns = 1'000'000LL;  ///< 1 ms
+        std::uint32_t flush_interval = 8U;
     };
 
     explicit Recorder(Config cfg);
@@ -70,7 +72,7 @@ class Recorder final
 
     bool IsEnabled() const
     {
-        return cfg_.enabled && file_.is_open();
+        return enabled_.load(std::memory_order_relaxed) && file_.is_open();
     }
 
     /// Record an entry. Thread-safe.
@@ -78,8 +80,10 @@ class Recorder final
 
   private:
     Config cfg_;
+    std::atomic<bool> enabled_{false};
     std::mutex mutex_;
     std::ofstream file_;
+    std::uint32_t flush_counter_{0U};
 };
 
 }  // namespace details
