@@ -12,56 +12,22 @@
 # *******************************************************************************
 
 load("@score_baselibs//:bazel/unit_tests.bzl", "cc_unit_test_suites_for_host_and_qnx")
-load("@score_baselibs//score/language/safecpp:toolchain_features.bzl", "COMPILER_WARNING_FEATURES")
 
-cc_library(
+alias(
     name = "clock_core",
-    hdrs = [
-        "availability_hook.h",
-        "clock.h",
-        "clock_snapshot.h",
-        "clock_status.h",
-        "clock_traits.h",
-        "no_status.h",
-        "subscription_hook.h",
-    ],
-    features = COMPILER_WARNING_FEATURES,
+    actual = "//score/time/clock/src:clock_core",
     visibility = ["//score/time:__subpackages__"],
-    deps = [
-        "@score_baselibs//score/language/futurecpp",
-    ],
 )
 
-# Test-only clock utilities: RAII override guard + direct-backend factory.
-# Mock libraries and test targets depend on this; production code must not.
-cc_library(
+alias(
     name = "clock_test_utils",
     testonly = True,
-    hdrs = [
-        "clock_test_factory.h",
-        "scoped_clock_override.h",
-    ],
-    features = COMPILER_WARNING_FEATURES,
+    actual = "//score/time/clock/src:clock_test_utils",
     visibility = ["//score/time:__subpackages__"],
-    deps = [":clock_core"],
-)
-
-cc_test(
-    name = "clock_status_test",
-    srcs = ["clock_status_test.cpp"],
-    features = COMPILER_WARNING_FEATURES,
-    tags = ["unit"],
-    deps = [
-        ":clock_core",
-        "@googletest//:gtest",
-        "@googletest//:gtest_main",
-    ],
 )
 
 cc_unit_test_suites_for_host_and_qnx(
     name = "unit_test_suite",
-    cc_unit_tests = [
-        ":clock_status_test",
-    ],
+    test_suites_from_sub_packages = ["//score/time/clock/src:unit_test_suite"],
     visibility = ["//score/time:__pkg__"],
 )

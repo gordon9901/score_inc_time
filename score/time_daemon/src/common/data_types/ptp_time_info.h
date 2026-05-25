@@ -17,7 +17,7 @@
 #include <ostream>
 #include <type_traits>
 
-#include "score/time/hpls_time/hpls_clock.h"
+#include "score/time/hpls_time/src/hpls_clock.h"
 
 namespace score
 {

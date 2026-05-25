@@ -30,8 +30,8 @@ alias(
     actual = "//score/time_daemon/src/ipc/svt/receiver:factory",
     tags = ["QM"],
     visibility = [
-        "//score/time/vehicle_time/details/td_impl:__pkg__",
         "//score/time_daemon:__subpackages__",
+        "//score/time/vehicle_time/src/details/td_impl:__pkg__",
     ],
 )
 
@@ -41,7 +41,7 @@ alias(
     actual = "//score/time_daemon/src/ipc/svt/receiver:factory_mock",
     tags = ["QM"],
     visibility = [
-        "//score/time/vehicle_time/details/td_impl:__pkg__",
+        "//score/time/vehicle_time/src/details/td_impl:__pkg__",
     ],
 )
 

@@ -12,7 +12,7 @@
  ********************************************************************************/
 #include "score/time_daemon/src/verification_machine/svt/validators/time_jumps_validator.h"
 
-#include "score/time/hpls_time/hpls_clock_mock.h"
+#include "score/time/hpls_time/src/hpls_clock_mock.h"
 
 #include "gmock/gmock.h"
 #include <gtest/gtest.h>

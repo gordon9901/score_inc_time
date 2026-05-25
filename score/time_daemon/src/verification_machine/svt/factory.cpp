@@ -14,7 +14,7 @@
 #include "score/time_daemon/src/verification_machine/svt/validators/synchronization_validator.h"
 #include "score/time_daemon/src/verification_machine/svt/validators/time_jumps_validator.h"
 #include "score/time_daemon/src/verification_machine/svt/validators/timeout_validator.h"
-#include "score/time/hpls_time/hpls_clock.h"
+#include "score/time/hpls_time/src/hpls_clock.h"
 
 namespace score
 {

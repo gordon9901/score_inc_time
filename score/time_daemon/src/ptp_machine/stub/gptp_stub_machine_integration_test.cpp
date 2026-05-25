@@ -12,7 +12,7 @@
  ********************************************************************************/
 #include "score/time_daemon/src/ptp_machine/stub/factory.h"
 #include "score/time_daemon/src/ptp_machine/stub/details/stub_ptp_engine.h"
-#include "score/time/hpls_time/hpls_clock.h"
+#include "score/time/hpls_time/src/hpls_clock.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
