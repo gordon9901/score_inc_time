@@ -28,7 +28,7 @@ std::uint64_t GetClockCyclesPerSec()
 }
 
 std::unique_ptr<TickProviderMock> TickProviderMock::mock_instance_{};
-std::mutex                        TickProviderMock::mutex_{};
+std::mutex TickProviderMock::mutex_{};
 
 }  // namespace qtime
 }  // namespace hirs_time

@@ -35,11 +35,11 @@ cc_library(
 )
 
 cc_test(
-    name = "vehicle_clock_impl_test",
+    name = "vehicle_clock_backend_impl_test",
     srcs = [
         "vehicle_clock_backend_impl.cpp",
         "vehicle_clock_backend_impl.h",
-        "vehicle_clock_impl_test.cpp",
+        "vehicle_clock_backend_impl_test.cpp",
         "//score/time/vehicle_time/src/details:logging_contexts",  # internal header
     ],
     features = COMPILER_WARNING_FEATURES,
@@ -58,6 +58,6 @@ cc_test(
 
 cc_unit_test_suites_for_host_and_qnx(
     name = "unit_test_suite",
-    cc_unit_tests = [":vehicle_clock_impl_test"],
+    cc_unit_tests = [":vehicle_clock_backend_impl_test"],
     visibility = ["//score/time/vehicle_time:__subpackages__"],
 )

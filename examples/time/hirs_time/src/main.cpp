@@ -61,7 +61,6 @@ void PrintReport(const examples::time::hirs_time::TimeReport& report, std::uint6
 
 int main()
 {
-    // Install signal handlers for clean shutdown.
     static_cast<void>(std::signal(SIGINT,  HandleSignal));
     static_cast<void>(std::signal(SIGTERM, HandleSignal));
 

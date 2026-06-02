@@ -29,12 +29,12 @@ cc_library(
 )
 
 cc_test(
-    name = "steady_clock_impl_test",
+    name = "steady_clock_backend_impl_test",
     testonly = True,
     srcs = [
         "steady_clock_backend_impl.cpp",
         "steady_clock_backend_impl.h",
-        "steady_clock_impl_test.cpp",
+        "steady_clock_backend_impl_test.cpp",
     ],
     features = COMPILER_WARNING_FEATURES,
     tags = ["unit"],
@@ -48,6 +48,6 @@ cc_test(
 
 cc_unit_test_suites_for_host_and_qnx(
     name = "unit_test_suite",
-    cc_unit_tests = [":steady_clock_impl_test"],
+    cc_unit_tests = [":steady_clock_backend_impl_test"],
     visibility = ["//score/time/steady_time/src/details:__pkg__"],
 )

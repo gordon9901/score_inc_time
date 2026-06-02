@@ -51,9 +51,9 @@ class VehicleTimeHandlerTest : public ::testing::Test
     }
 
     std::shared_ptr<score::time::VehicleClockBackendMock> vehicle_mock_;
-    std::shared_ptr<score::time::HirsClockBackendMock>    hirs_mock_;
-    score::time::test_utils::ScopedClockOverride<score::time::VehicleTime>  vehicle_guard_;
-    score::time::test_utils::ScopedClockOverride<score::time::HirsTime>     hirs_guard_;
+    std::shared_ptr<score::time::HirsClockBackendMock> hirs_mock_;
+    score::time::test_utils::ScopedClockOverride<score::time::VehicleTime> vehicle_guard_;
+    score::time::test_utils::ScopedClockOverride<score::time::HirsTime> hirs_guard_;
 };
 
 TEST_F(VehicleTimeHandlerTest, InitReturnsTrueWhenBackendInitSucceeds)
@@ -72,7 +72,6 @@ TEST_F(VehicleTimeHandlerTest, InitReturnsFalseWhenBackendInitFails)
 
 TEST_F(VehicleTimeHandlerTest, ReportContainsSynchronizedVehicleTimeAndHirsTime)
 {
-    // Prepare a synchronized vehicle time snapshot.
     score::time::VehicleTimeStatus status;
     status.flags = score::time::ClockStatus<score::time::VehicleTime::StatusFlag>{
         {score::time::VehicleTime::StatusFlag::kSynchronized}};

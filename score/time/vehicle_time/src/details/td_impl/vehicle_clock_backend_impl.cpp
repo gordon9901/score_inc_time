@@ -30,7 +30,7 @@ namespace detail
 
 VehicleClockBackendImpl::VehicleClockBackendImpl(
     std::shared_ptr<score::td::SvtReceiver> receiver,
-    HirsClock                               local_clock) noexcept
+    HirsClock local_clock) noexcept
     : is_ready_{false}
     , init_mutex_{}
     , svt_receiver_{std::move(receiver)}
@@ -81,10 +81,9 @@ bool VehicleClockBackendImpl::Init() noexcept
 {
     if (is_ready_.load(std::memory_order_acquire))
     {
-        return true;  // fast path: already initialised
+        return true;
     }
 
-    // Need to avoid concurrent Init() calls
     const std::lock_guard<std::mutex> init_guard{init_mutex_};
 
     // Lets check if another thread completed init while we waited for the lock
@@ -111,8 +110,8 @@ bool VehicleClockBackendImpl::IsAvailable() const noexcept
 }
 
 bool VehicleClockBackendImpl::WaitUntilAvailable(
-    const score::cpp::stop_token&          token,
-    std::chrono::steady_clock::time_point  until) const noexcept
+    const score::cpp::stop_token& token,
+    std::chrono::steady_clock::time_point until) const noexcept
 {
     bool should_poll = false;
     do

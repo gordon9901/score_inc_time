@@ -13,7 +13,7 @@
 #ifndef SCORE_TIME_VEHICLE_TIME_SRC_DETAILS_TD_IMPL_VEHICLE_CLOCK_BACKEND_IMPL_H
 #define SCORE_TIME_VEHICLE_TIME_SRC_DETAILS_TD_IMPL_VEHICLE_CLOCK_BACKEND_IMPL_H
 
-// Internal header — include ONLY from vehicle_clock_backend_impl.cpp and vehicle_clock_impl_test.cpp.
+// Internal header — include ONLY from vehicle_clock_backend_impl.cpp and vehicle_clock_backend_impl_test.cpp.
 // NOT part of the public API of td_impl.
 
 #include "score/time/vehicle_time/src/vehicle_clock_backend.h"
@@ -49,19 +49,19 @@ namespace detail
 /// until the TimeDaemon IPC layer provides a subscription facility.
 ///
 /// @note Placed in @c score::time::detail (rather than an anonymous namespace) so
-/// that vehicle_clock_impl_test.cpp can construct it directly with injected mocks.
+/// that vehicle_clock_backend_impl_test.cpp can construct it directly with injected mocks.
 /// Only one backend translation unit must be linked per binary to avoid ODR issues.
 class VehicleClockBackendImpl final : public VehicleClockBackend
 {
   public:
     VehicleClockBackendImpl(std::shared_ptr<score::td::SvtReceiver> receiver,
-                     HirsClock                               local_clock) noexcept;
+                            HirsClock local_clock) noexcept;
 
-    ~VehicleClockBackendImpl() noexcept override                    = default;
-    VehicleClockBackendImpl(const VehicleClockBackendImpl&)                = delete;
-    VehicleClockBackendImpl& operator=(const VehicleClockBackendImpl&)     = delete;
-    VehicleClockBackendImpl(VehicleClockBackendImpl&&)                     = delete;
-    VehicleClockBackendImpl& operator=(VehicleClockBackendImpl&&)          = delete;
+    ~VehicleClockBackendImpl() noexcept override = default;
+    VehicleClockBackendImpl(const VehicleClockBackendImpl&) = delete;
+    VehicleClockBackendImpl& operator=(const VehicleClockBackendImpl&) = delete;
+    VehicleClockBackendImpl(VehicleClockBackendImpl&&) = delete;
+    VehicleClockBackendImpl& operator=(VehicleClockBackendImpl&&) = delete;
 
     ClockSnapshot<VehicleTime::Timepoint, VehicleTimeStatus> Now() const noexcept override;
 
@@ -69,7 +69,7 @@ class VehicleClockBackendImpl final : public VehicleClockBackend
 
     bool IsAvailable() const noexcept override;
 
-    bool WaitUntilAvailable(const score::cpp::stop_token&         token,
+    bool WaitUntilAvailable(const score::cpp::stop_token& token,
                             std::chrono::steady_clock::time_point until) const noexcept override;
 
     void SetTimeSlaveSyncDataReceivedCallback(
@@ -88,10 +88,10 @@ class VehicleClockBackendImpl final : public VehicleClockBackend
     static ClockStatus<VehicleTime::StatusFlag> ConvertPtpStatus(
         const score::td::svt::TimeBaseStatus& ptp_status) noexcept;
 
-    std::atomic_bool                           is_ready_;
-    std::mutex                                 init_mutex_;
-    std::shared_ptr<score::td::SvtReceiver>    svt_receiver_;
-    HirsClock                                  local_clock_;
+    std::atomic_bool is_ready_;
+    std::mutex init_mutex_;
+    std::shared_ptr<score::td::SvtReceiver> svt_receiver_;
+    HirsClock local_clock_;
 };
 
 }  // namespace detail

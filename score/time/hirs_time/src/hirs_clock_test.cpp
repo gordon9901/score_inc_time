@@ -26,8 +26,6 @@ namespace score
 namespace time
 {
 
-// ── UC5: HirsClock::Now().time_point + duration arithmetic ───────────────────
-
 TEST(HirsClockTest, NowReturnsTimepointSuitableForDurationArithmetic)
 {
     auto mock = std::make_shared<HirsClockBackendMock>();

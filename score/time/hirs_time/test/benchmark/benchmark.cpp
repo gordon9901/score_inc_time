@@ -34,7 +34,6 @@ class HirsClockBenchmarkFixture : public benchmark::Fixture
     HirsClock clock_;
 };
 
-// Benchmark HirsClock::Now() end-to-end latency using the production backend.
 BENCHMARK_F(HirsClockBenchmarkFixture, NowLatency)(benchmark::State& state)
 {
     for (auto _ : state)
@@ -43,7 +42,6 @@ BENCHMARK_F(HirsClockBenchmarkFixture, NowLatency)(benchmark::State& state)
     }
 }
 
-// Run the benchmark
 BENCHMARK_MAIN();
 
 }  // namespace time

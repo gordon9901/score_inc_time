@@ -13,12 +13,73 @@
 #include "score/time/vehicle_time/src/vehicle_clock.h"
 #include "score/time/vehicle_time/src/vehicle_clock_backend.h"
 
+#include <map>
+#include <string>
 #include <utility>
 
 namespace score
 {
 namespace time
 {
+
+template <>
+bool ClockStatus<VehicleTime::StatusFlag>::IsReliable() const noexcept
+{
+    return (IsFlagActive(VehicleTime::StatusFlag::kSynchronized) &&
+            (!IsAnyOfFlagsActive({VehicleTime::StatusFlag::kTimeOut,
+                                  VehicleTime::StatusFlag::kTimeLeapFuture,
+                                  VehicleTime::StatusFlag::kTimeLeapPast})));
+}
+
+template <>
+bool ClockStatus<VehicleTime::StatusFlag>::HasBeenSynchronized() const noexcept
+{
+    return IsFlagActive(VehicleTime::StatusFlag::kSynchronized);
+}
+
+template <>
+bool ClockStatus<VehicleTime::StatusFlag>::IsConsistent() const noexcept
+{
+    if (IsFlagActive(VehicleTime::StatusFlag::kUnknown))
+    {
+        return false;
+    }
+    if (!IsAnyOfFlagsActive({VehicleTime::StatusFlag::kTimeOut,
+                             VehicleTime::StatusFlag::kSynchronized,
+                             VehicleTime::StatusFlag::kSynchToGateway,
+                             VehicleTime::StatusFlag::kTimeLeapFuture,
+                             VehicleTime::StatusFlag::kTimeLeapPast}))
+    {
+        return false;
+    }
+    if (IsFlagActive(VehicleTime::StatusFlag::kTimeLeapFuture) &&
+        IsFlagActive(VehicleTime::StatusFlag::kTimeLeapPast))
+    {
+        return false;
+    }
+    return true;
+}
+
+template <>
+std::ostringstream ClockStatus<VehicleTime::StatusFlag>::PrintTo() const
+{
+    static const std::map<VehicleTime::StatusFlag, std::string> kFlagNames = {
+        {VehicleTime::StatusFlag::kTimeOut,        "kTimeOut"},
+        {VehicleTime::StatusFlag::kSynchronized,   "kSynchronized"},
+        {VehicleTime::StatusFlag::kSynchToGateway, "kSynchToGateway"},
+        {VehicleTime::StatusFlag::kTimeLeapFuture, "kTimeLeapFuture"},
+        {VehicleTime::StatusFlag::kTimeLeapPast,   "kTimeLeapPast"},
+        {VehicleTime::StatusFlag::kUnknown,        "kUnknown"},
+    };
+    std::ostringstream oss;
+    oss << "[";
+    for (const auto& entry : kFlagNames)
+    {
+        oss << entry.second << ": " << (IsFlagActive(entry.first) ? "true" : "false") << ", ";
+    }
+    oss << "]";
+    return oss;
+}
 
 ClockTraits<VehicleTime>::Snapshot
 ClockTraits<VehicleTime>::CallNow(const Backend& impl) noexcept

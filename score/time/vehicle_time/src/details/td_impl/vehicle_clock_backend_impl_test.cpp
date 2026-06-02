@@ -34,14 +34,14 @@ namespace
 using namespace std::chrono_literals;
 using ::testing::Return;
 
-using SvtMock     = score::td::ReceiverMock<score::td::svt::TimeBaseSnapshot>;
+using SvtMock = score::td::ReceiverMock<score::td::svt::TimeBaseSnapshot>;
 using SvtSnapshot = score::td::svt::TimeBaseSnapshot;
-using SvtStatus   = score::td::svt::TimeBaseStatus;
+using SvtStatus = score::td::svt::TimeBaseStatus;
 
-class VehicleTimeImplTest : public ::testing::Test
+class VehicleClockBackendImplTest : public ::testing::Test
 {
   protected:
-    VehicleTimeImplTest()
+    VehicleClockBackendImplTest()
         : mock_hirs_{std::make_shared<HirsClockBackendMock>()}
         , hirs_guard_{mock_hirs_}
         , mock_svt_{std::make_shared<SvtMock>()}
@@ -49,45 +49,41 @@ class VehicleTimeImplTest : public ::testing::Test
     {
     }
 
-    std::shared_ptr<HirsClockBackendMock>             mock_hirs_;
-    test_utils::ScopedClockOverride<HirsTime>              hirs_guard_;
-    std::shared_ptr<SvtMock>                  mock_svt_;
+    std::shared_ptr<HirsClockBackendMock> mock_hirs_;
+    test_utils::ScopedClockOverride<HirsTime> hirs_guard_;
+    std::shared_ptr<SvtMock> mock_svt_;
     std::unique_ptr<detail::VehicleClockBackendImpl> impl_;
 };
 
-// ── Init / IsAvailable ───────────────────────────────────────────────────────
-
-TEST_F(VehicleTimeImplTest, IsAvailableReturnsFalseBeforeInit)
+TEST_F(VehicleClockBackendImplTest, IsAvailableReturnsFalseBeforeInit)
 {
     EXPECT_FALSE(impl_->IsAvailable());
 }
 
-TEST_F(VehicleTimeImplTest, InitReturnsFalseWhenReceiverInitFails)
+TEST_F(VehicleClockBackendImplTest, InitReturnsFalseWhenReceiverInitFails)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(false));
     EXPECT_FALSE(impl_->Init());
     EXPECT_FALSE(impl_->IsAvailable());
 }
 
-TEST_F(VehicleTimeImplTest, InitReturnsTrueWhenReceiverInitSucceeds)
+TEST_F(VehicleClockBackendImplTest, InitReturnsTrueWhenReceiverInitSucceeds)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     EXPECT_TRUE(impl_->Init());
     EXPECT_TRUE(impl_->IsAvailable());
 }
 
-TEST_F(VehicleTimeImplTest, InitIsIdempotentAfterSuccess)
+TEST_F(VehicleClockBackendImplTest, InitIsIdempotentAfterSuccess)
 {
-    // svt_receiver_->Init() is called only once even when Init() is called twice.
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     EXPECT_TRUE(impl_->Init());
-    EXPECT_TRUE(impl_->Init());  // idempotent — no second svt_receiver_->Init()
+    EXPECT_TRUE(impl_->Init());
     EXPECT_TRUE(impl_->IsAvailable());
 }
 
-TEST_F(VehicleTimeImplTest, InitTrueAllowsNowToReturnData)
+TEST_F(VehicleClockBackendImplTest, InitTrueAllowsNowToReturnData)
 {
-    // Control-flow: Init() → IsAvailable() == true → Now() returns non-kUnknown snapshot.
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
     EXPECT_TRUE(impl_->IsAvailable());
@@ -101,16 +97,13 @@ TEST_F(VehicleTimeImplTest, InitTrueAllowsNowToReturnData)
     EXPECT_FALSE(snapshot.Status().IsFlagActive(VehicleTime::StatusFlag::kUnknown));
 }
 
-// ── Now — pre-conditions ──────────────────────────────────────────────────────
-
-TEST_F(VehicleTimeImplTest, NowReturnsUnknownStatusWhenNotReady)
+TEST_F(VehicleClockBackendImplTest, NowReturnsUnknownStatusWhenNotReady)
 {
-    // is_ready_ is false by default — Init() not called
     const auto snapshot = impl_->Now();
     EXPECT_TRUE(snapshot.Status().IsFlagActive(VehicleTime::StatusFlag::kUnknown));
 }
 
-TEST_F(VehicleTimeImplTest, NowReturnsUnknownStatusWhenReceiveReturnsNullopt)
+TEST_F(VehicleClockBackendImplTest, NowReturnsUnknownStatusWhenReceiveReturnsNullopt)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
@@ -120,12 +113,11 @@ TEST_F(VehicleTimeImplTest, NowReturnsUnknownStatusWhenReceiveReturnsNullopt)
     EXPECT_TRUE(snapshot.Status().IsFlagActive(VehicleTime::StatusFlag::kUnknown));
 }
 
-TEST_F(VehicleTimeImplTest, NowReturnsUnknownStatusWhenLocalClockBehindCapture)
+TEST_F(VehicleClockBackendImplTest, NowReturnsUnknownStatusWhenLocalClockBehindCapture)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
 
-    // local_time = 600, now_local = 500 → now_local < local_at_capture → unknown
     const SvtSnapshot data{1000ULL, 600ULL, 0.0, {true, false, false, false, true}, {}, {}};
     EXPECT_CALL(*mock_svt_, Receive()).WillOnce(Return(data));
 
@@ -137,9 +129,7 @@ TEST_F(VehicleTimeImplTest, NowReturnsUnknownStatusWhenLocalClockBehindCapture)
     EXPECT_TRUE(snapshot.Status().IsFlagActive(VehicleTime::StatusFlag::kUnknown));
 }
 
-// ── Now — adjusted timestamp ──────────────────────────────────────────────────
-
-TEST_F(VehicleTimeImplTest, NowComputesAdjustedTimestamp)
+TEST_F(VehicleClockBackendImplTest, NowComputesAdjustedTimestamp)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
@@ -157,9 +147,7 @@ TEST_F(VehicleTimeImplTest, NowComputesAdjustedTimestamp)
     EXPECT_EQ(snapshot.TimePoint().time_since_epoch().count(), 1100);
 }
 
-// ── Now — ConvertPtpStatus mapping ────────────────────────────────────────────
-
-TEST_F(VehicleTimeImplTest, NowSetsSynchronizedFlagFromSvtStatus)
+TEST_F(VehicleClockBackendImplTest, NowSetsSynchronizedFlagFromSvtStatus)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
@@ -173,12 +161,11 @@ TEST_F(VehicleTimeImplTest, NowSetsSynchronizedFlagFromSvtStatus)
     EXPECT_TRUE(snapshot.Status().IsFlagActive(VehicleTime::StatusFlag::kSynchronized));
 }
 
-TEST_F(VehicleTimeImplTest, NowSetsTimeOutFlagFromSvtStatus)
+TEST_F(VehicleClockBackendImplTest, NowSetsTimeOutFlagFromSvtStatus)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
 
-    // is_timeout = true
     const SvtSnapshot data{0ULL, 0ULL, 0.0, {false, true, false, false, true}, {}, {}};
     EXPECT_CALL(*mock_svt_, Receive()).WillOnce(Return(data));
     EXPECT_CALL(*mock_hirs_, Now())
@@ -188,12 +175,11 @@ TEST_F(VehicleTimeImplTest, NowSetsTimeOutFlagFromSvtStatus)
     EXPECT_TRUE(snapshot.Status().IsFlagActive(VehicleTime::StatusFlag::kTimeOut));
 }
 
-TEST_F(VehicleTimeImplTest, NowSetsTimeLeapFutureFlagFromSvtStatus)
+TEST_F(VehicleClockBackendImplTest, NowSetsTimeLeapFutureFlagFromSvtStatus)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
 
-    // is_time_jump_future = true
     const SvtSnapshot data{0ULL, 0ULL, 0.0, {false, false, true, false, true}, {}, {}};
     EXPECT_CALL(*mock_svt_, Receive()).WillOnce(Return(data));
     EXPECT_CALL(*mock_hirs_, Now())
@@ -203,12 +189,11 @@ TEST_F(VehicleTimeImplTest, NowSetsTimeLeapFutureFlagFromSvtStatus)
     EXPECT_TRUE(snapshot.Status().IsFlagActive(VehicleTime::StatusFlag::kTimeLeapFuture));
 }
 
-TEST_F(VehicleTimeImplTest, NowSetsTimeLeapPastFlagFromSvtStatus)
+TEST_F(VehicleClockBackendImplTest, NowSetsTimeLeapPastFlagFromSvtStatus)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
 
-    // is_time_jump_past = true
     const SvtSnapshot data{0ULL, 0ULL, 0.0, {false, false, false, true, true}, {}, {}};
     EXPECT_CALL(*mock_svt_, Receive()).WillOnce(Return(data));
     EXPECT_CALL(*mock_hirs_, Now())
@@ -218,12 +203,11 @@ TEST_F(VehicleTimeImplTest, NowSetsTimeLeapPastFlagFromSvtStatus)
     EXPECT_TRUE(snapshot.Status().IsFlagActive(VehicleTime::StatusFlag::kTimeLeapPast));
 }
 
-TEST_F(VehicleTimeImplTest, NowSetsUnknownFlagWhenIsCorrectIsFalse)
+TEST_F(VehicleClockBackendImplTest, NowSetsUnknownFlagWhenIsCorrectIsFalse)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
 
-    // is_correct = false → kUnknown
     const SvtSnapshot data{0ULL, 0ULL, 0.0, {false, false, false, false, false}, {}, {}};
     EXPECT_CALL(*mock_svt_, Receive()).WillOnce(Return(data));
     EXPECT_CALL(*mock_hirs_, Now())
@@ -233,7 +217,7 @@ TEST_F(VehicleTimeImplTest, NowSetsUnknownFlagWhenIsCorrectIsFalse)
     EXPECT_TRUE(snapshot.Status().IsFlagActive(VehicleTime::StatusFlag::kUnknown));
 }
 
-TEST_F(VehicleTimeImplTest, NowForwardsRateDeviation)
+TEST_F(VehicleClockBackendImplTest, NowForwardsRateDeviation)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
@@ -247,9 +231,7 @@ TEST_F(VehicleTimeImplTest, NowForwardsRateDeviation)
     EXPECT_DOUBLE_EQ(snapshot.Status().RateDeviation(), 2.5);
 }
 
-// ── WaitUntilAvailable ───────────────────────────────────────────────────────
-
-TEST_F(VehicleTimeImplTest, WaitUntilAvailableReturnsTrueWhenInitSucceeds)
+TEST_F(VehicleClockBackendImplTest, WaitUntilAvailableReturnsTrueWhenInitSucceeds)
 {
     EXPECT_CALL(*mock_svt_, Init()).WillOnce(Return(true));
     impl_->Init();
@@ -257,7 +239,7 @@ TEST_F(VehicleTimeImplTest, WaitUntilAvailableReturnsTrueWhenInitSucceeds)
     EXPECT_TRUE(impl_->WaitUntilAvailable(score::cpp::stop_source{}.get_token(), deadline));
 }
 
-TEST_F(VehicleTimeImplTest, WaitUntilAvailableReturnsFalseWhenStopRequested)
+TEST_F(VehicleClockBackendImplTest, WaitUntilAvailableReturnsFalseWhenStopRequested)
 {
     score::cpp::stop_source ss;
     ss.request_stop();
@@ -265,15 +247,13 @@ TEST_F(VehicleTimeImplTest, WaitUntilAvailableReturnsFalseWhenStopRequested)
     EXPECT_FALSE(impl_->WaitUntilAvailable(ss.get_token(), deadline));
 }
 
-TEST_F(VehicleTimeImplTest, WaitUntilAvailableReturnsFalseWhenDeadlinePassed)
+TEST_F(VehicleClockBackendImplTest, WaitUntilAvailableReturnsFalseWhenDeadlinePassed)
 {
     const auto past_deadline = std::chrono::steady_clock::now() - std::chrono::seconds{1};
     EXPECT_FALSE(impl_->WaitUntilAvailable(score::cpp::stop_source{}.get_token(), past_deadline));
 }
 
-// ── Callback no-ops ──────────────────────────────────────────────────────────
-
-TEST_F(VehicleTimeImplTest, CallbackMethodsAreNoOps)
+TEST_F(VehicleClockBackendImplTest, CallbackMethodsAreNoOps)
 {
     impl_->SetTimeSlaveSyncDataReceivedCallback(
         [](const TimeSlaveSyncData<VehicleTime>&) {});
@@ -281,7 +261,6 @@ TEST_F(VehicleTimeImplTest, CallbackMethodsAreNoOps)
     impl_->SetPDelayMeasurementFinishedCallback(
         [](const PDelayMeasurementData<VehicleTime>&) {});
     impl_->UnsetPDelayMeasurementFinishedCallback();
-    // No crash = pass.
 }
 
 }  // namespace

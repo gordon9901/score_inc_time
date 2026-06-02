@@ -65,7 +65,7 @@ class TickProviderMock
 
   private:
     static std::unique_ptr<TickProviderMock> mock_instance_;
-    static std::mutex                        mutex_;
+    static std::mutex mutex_;
 };
 
 }  // namespace qtime

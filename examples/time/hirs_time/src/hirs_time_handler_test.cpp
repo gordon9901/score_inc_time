@@ -43,7 +43,7 @@ class HirsTimeHandlerTest : public ::testing::Test
     {
     }
 
-    std::shared_ptr<score::time::HirsClockBackendMock>          mock_;
+    std::shared_ptr<score::time::HirsClockBackendMock> mock_;
     score::time::test_utils::ScopedClockOverride<score::time::HirsTime> guard_;
 };
 

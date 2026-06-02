@@ -45,11 +45,11 @@ std::chrono::nanoseconds HirsQClock::ClockCyclesToNanoseconds(
 
     if (cycles_per_sec > 0U)
     {
-        constexpr auto     billion    = static_cast<std::uint64_t>(std::nano::den);
-        constexpr auto     max_value  = static_cast<std::uint64_t>(std::chrono::nanoseconds::max().count());
+        constexpr auto billion = static_cast<std::uint64_t>(std::nano::den);
+        constexpr auto max_value = static_cast<std::uint64_t>(std::chrono::nanoseconds::max().count());
         constexpr std::uint64_t upper_bound{max_value / billion};
-        const std::uint64_t     division_result{clock_cycles / cycles_per_sec};
-        const std::uint64_t     division_rest{clock_cycles % cycles_per_sec};
+        const std::uint64_t division_result{clock_cycles / cycles_per_sec};
+        const std::uint64_t division_rest{clock_cycles % cycles_per_sec};
         if ((division_result <= upper_bound) && (division_rest <= upper_bound))
         {
             converted = std::chrono::nanoseconds{division_result * billion +

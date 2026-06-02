@@ -21,9 +21,7 @@
 
 #include <chrono>
 #include <cstdint>
-#include <map>
 #include <sstream>
-#include <string>
 
 namespace score
 {
@@ -63,78 +61,28 @@ struct VehicleTime
         score::cpp::callback<void(const PDelayMeasurementData<VehicleTime>&), kCallbackCapacity>;
 };
 
-// Explicit specialisations for ClockStatus<VehicleTime::StatusFlag>.
-// Defined inline here so they are visible before VehicleTimeStatus uses them.
-
 /// \brief Returns true if the vehicle time data is reliable for use right now.
 ///
 /// Reliable := kSynchronized is set AND none of {kTimeOut, kTimeLeapFuture, kTimeLeapPast} is set.
 template <>
-inline bool ClockStatus<VehicleTime::StatusFlag>::IsReliable() const noexcept
-{
-    return (IsFlagActive(VehicleTime::StatusFlag::kSynchronized) &&
-            (!IsAnyOfFlagsActive({VehicleTime::StatusFlag::kTimeOut,
-                                  VehicleTime::StatusFlag::kTimeLeapFuture,
-                                  VehicleTime::StatusFlag::kTimeLeapPast})));
-}
+bool ClockStatus<VehicleTime::StatusFlag>::IsReliable() const noexcept;
 
 /// \brief Returns true if the vehicle time has been synchronized at least once during this lifecycle.
 ///
 /// HasBeenSynchronized := kSynchronized flag is set, regardless of any active fault flags.
 template <>
-inline bool ClockStatus<VehicleTime::StatusFlag>::HasBeenSynchronized() const noexcept
-{
-    return IsFlagActive(VehicleTime::StatusFlag::kSynchronized);
-}
+bool ClockStatus<VehicleTime::StatusFlag>::HasBeenSynchronized() const noexcept;
 
 /// \brief Returns true if the vehicle time status flags are internally consistent (no contradictory combination).
 ///
 /// Consistent := kUnknown is NOT set, at least one non-kUnknown flag is set,
 ///               and kTimeLeapFuture and kTimeLeapPast are not both set simultaneously.
 template <>
-inline bool ClockStatus<VehicleTime::StatusFlag>::IsConsistent() const noexcept
-{
-    if (IsFlagActive(VehicleTime::StatusFlag::kUnknown))
-    {
-        return false;
-    }
-    if (!IsAnyOfFlagsActive({VehicleTime::StatusFlag::kTimeOut,
-                             VehicleTime::StatusFlag::kSynchronized,
-                             VehicleTime::StatusFlag::kSynchToGateway,
-                             VehicleTime::StatusFlag::kTimeLeapFuture,
-                             VehicleTime::StatusFlag::kTimeLeapPast}))
-    {
-        return false;
-    }
-    if (IsFlagActive(VehicleTime::StatusFlag::kTimeLeapFuture) &&
-        IsFlagActive(VehicleTime::StatusFlag::kTimeLeapPast))
-    {
-        return false;
-    }
-    return true;
-}
+bool ClockStatus<VehicleTime::StatusFlag>::IsConsistent() const noexcept;
 
 /// \brief Formats all active VehicleTime status flags into an ostringstream for diagnostics.
 template <>
-inline std::ostringstream ClockStatus<VehicleTime::StatusFlag>::PrintTo() const
-{
-    static const std::map<VehicleTime::StatusFlag, std::string> kFlagNames = {
-        {VehicleTime::StatusFlag::kTimeOut,        "kTimeOut"},
-        {VehicleTime::StatusFlag::kSynchronized,   "kSynchronized"},
-        {VehicleTime::StatusFlag::kSynchToGateway, "kSynchToGateway"},
-        {VehicleTime::StatusFlag::kTimeLeapFuture, "kTimeLeapFuture"},
-        {VehicleTime::StatusFlag::kTimeLeapPast,   "kTimeLeapPast"},
-        {VehicleTime::StatusFlag::kUnknown,        "kUnknown"},
-    };
-    std::ostringstream oss;
-    oss << "[";
-    for (const auto& entry : kFlagNames)
-    {
-        oss << entry.second << ": " << (IsFlagActive(entry.first) ? "true" : "false") << ", ";
-    }
-    oss << "]";
-    return oss;
-}
+std::ostringstream ClockStatus<VehicleTime::StatusFlag>::PrintTo() const;
 
 ///
 /// \brief Synchronisation-quality status snapshot for the vehicle time domain.

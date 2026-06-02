@@ -43,8 +43,8 @@ class SteadyTimeHandlerTest : public ::testing::Test
     {
     }
 
-    std::shared_ptr<score::time::SteadyClockBackendMock>                   mock_;
-    score::time::test_utils::ScopedClockOverride<std::chrono::steady_clock>       guard_;
+    std::shared_ptr<score::time::SteadyClockBackendMock> mock_;
+    score::time::test_utils::ScopedClockOverride<std::chrono::steady_clock> guard_;
 };
 
 TEST_F(SteadyTimeHandlerTest, ReportContainsMonotonicTimeFromMock)

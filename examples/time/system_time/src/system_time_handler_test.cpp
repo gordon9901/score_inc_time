@@ -43,8 +43,8 @@ class SystemTimeHandlerTest : public ::testing::Test
     {
     }
 
-    std::shared_ptr<score::time::SystemClockBackendMock>                   mock_;
-    score::time::test_utils::ScopedClockOverride<std::chrono::system_clock>      guard_;
+    std::shared_ptr<score::time::SystemClockBackendMock> mock_;
+    score::time::test_utils::ScopedClockOverride<std::chrono::system_clock> guard_;
 };
 
 TEST_F(SystemTimeHandlerTest, ReportContainsUnixTimeFromMock)
