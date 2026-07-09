@@ -431,14 +431,42 @@ verifies and validates the timepoints, and distributes this time information acr
 <div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>build<span class="w"> </span>//:docs
 </pre></div>
 </div>
+<p><strong>Dependency lock file</strong></p>
+<p>After modifying <code class="docutils literal notranslate"><span class="pre">MODULE.bazel</span></code> (adding or bumping a dependency), update the lock file:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>mod<span class="w"> </span>tidy
+</pre></div>
+</div>
+<p>Commit both <code class="docutils literal notranslate"><span class="pre">MODULE.bazel</span></code> and <code class="docutils literal notranslate"><span class="pre">MODULE.bazel.lock</span></code> together. The
+<code class="docutils literal notranslate"><span class="pre">Process</span> <span class="pre">/</span> <span class="pre">Bzlmod</span> <span class="pre">Lock</span> <span class="pre">Check</span></code> CI job enforces this — see
+<a class="reference external" href="https://github.com/eclipse-score/score/issues/2628">eclipse-score/score#2628</a>.</p>
+<p><strong>Formatting</strong></p>
+<p>Check formatting for all files (Python, Starlark, YAML, C++):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span><span class="nb">test</span><span class="w"> </span>//:format.check
+</pre></div>
+</div>
+<p>Auto-fix formatting for all files:</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span>run<span class="w"> </span>//:format.fix
+</pre></div>
+</div>
+<p><strong>Static Code Analysis</strong></p>
+<p>Run clang-tidy (powered by <code class="docutils literal notranslate"><span class="pre">score_cpp_policies</span></code>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--config<span class="o">=</span>clang-tidy<span class="w"> </span>//score/...
+</pre></div>
+</div>
+<p><strong>Sanitizers</strong></p>
+<p>Run address, undefined-behaviour and leak sanitizers (powered by <code class="docutils literal notranslate"><span class="pre">score_cpp_policies</span></code>):</p>
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>bazel<span class="w"> </span><span class="nb">test</span><span class="w"> </span>--config<span class="o">=</span>asan_ubsan_lsan<span class="w"> </span>--config<span class="o">=</span>time-x86_64-linux<span class="w"> </span>//score/...
+</pre></div>
+</div>
+<p>Individual sanitizer aliases are also available: <code class="docutils literal notranslate"><span class="pre">--config=asan</span></code>, <code class="docutils literal notranslate"><span class="pre">--config=ubsan</span></code>, <code class="docutils literal notranslate"><span class="pre">--config=lsan</span></code>.</p>
 </section>
 <section id="configuration">
 <h2><a class="toc-backref" href="#id4" role="doc-backlink">Configuration</a><a class="headerlink" href="#configuration" title="Link to this heading">#</a></h2>
 <p>The <cite>project_config.bzl</cite> file defines metadata used by Bazel macros.</p>
 <p>Example:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">PROJECT_CONFIG</span> <span class="o">=</span> <span class="p">{</span>
-    <span class="s2">&quot;asil_level&quot;</span><span class="p">:</span> <span class="s2">&quot;QM&quot;</span><span class="p">,</span>
-    <span class="s2">&quot;source_code&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;cpp&quot;</span><span class="p">,</span> <span class="s2">&quot;rust&quot;</span><span class="p">]</span>
+   <span class="s2">&quot;asil_level&quot;</span><span class="p">:</span> <span class="s2">&quot;QM&quot;</span><span class="p">,</span>
+   <span class="s2">&quot;source_code&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;cpp&quot;</span><span class="p">,</span> <span class="s2">&quot;rust&quot;</span><span class="p">]</span>
 <span class="p">}</span>
 </pre></div>
 </div>
