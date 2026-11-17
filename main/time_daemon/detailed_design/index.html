@@ -484,7 +484,7 @@
                   
   <section id="time-daemon-detailed-design">
 <span id="id1"></span><h1>Time Daemon Detailed Design<a class="headerlink" href="#time-daemon-detailed-design" title="Link to this heading">#</a></h1>
-<div class="need_container docutils container" id="SNCB-7dc2213f">
+<div class="need_container docutils container" id="SNCB-7d3eab34">
 <div class="pst-scrollable-table-container"><table class="need needs_grid_complex needs_layout_score needs_style_none needs_type_document table" id="doc__time_daemon_detailed_design">
 <tbody>
 <tr class="head row-odd"><td class="head_left" colspan="2"><div class="needs_head_left line-block">
@@ -543,7 +543,7 @@
 </ol>
 <p>The raw architectural diagram is represented below.</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
-<object data="../../_images/plantuml-473cb6c52e0b3d5a4b1627286045482aafe0cede.svg" type="image/svg+xml" style="width:720px;height:1022px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-473cb6c52e0b3d5a4b1627286045482aafe0cede.svg" type="image/svg+xml" style="width:721px;height:1022px;background:#FFFFFF;"></object></p>
 </div></section>
 </section>
 <section id="rationale-behind-decomposition-into-units">
@@ -568,14 +568,14 @@ and clear responsibility boundaries critical for ASIL_B safety qualification.</p
 <p>Main classes and unit relationships are presented on this diagram:</p>
 <div style="overflow-x: auto; max-width: 100%;"><figure class="align-center">
 <p class="plantuml">
-<object data="../../_images/plantuml-806e4092fde127973d17e0a8f4e855b0528b900d.svg" type="image/svg+xml" style="width:1804px;height:935px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-806e4092fde127973d17e0a8f4e855b0528b900d.svg" type="image/svg+xml" style="width:1803px;height:937px;background:#FFFFFF;"></object></p>
 </figure>
 </div></section>
 <section id="deployment-view">
 <h3>Deployment View<a class="headerlink" href="#deployment-view" title="Link to this heading">#</a></h3>
 <p>The design deployment and process architecture is represented on this diagram:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
-<object data="../../_images/plantuml-386dea10cf581d15ace123600ad33e11de74335f.svg" type="image/svg+xml" style="width:378px;height:899px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-386dea10cf581d15ace123600ad33e11de74335f.svg" type="image/svg+xml" style="width:443px;height:898px;background:#FFFFFF;"></object></p>
 </div></section>
 </section>
 <section id="dynamic-diagrams-for-unit-interactions">
@@ -675,7 +675,7 @@ it invokes <code class="docutils literal notranslate"><span class="pre">CreateCo
 The status remains <code class="docutils literal notranslate"><span class="pre">kIdle</span></code>. Successful daemon initialization therefore means that setup is complete, not that
 machine initialization or startup is complete.</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
-<object data="../../_images/plantuml-38891e5785f5b6806f52fe150319eb5956ef7e70.svg" type="image/svg+xml" style="width:702px;height:605px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-38891e5785f5b6806f52fe150319eb5956ef7e70.svg" type="image/svg+xml" style="width:703px;height:606px;background:#FFFFFF;"></object></p>
 </div><p>The four status values have the following actions:</p>
 <dl class="simple">
 <dt><code class="docutils literal notranslate"><span class="pre">kIdle</span></code></dt><dd><p>The handler has not been started. <code class="docutils literal notranslate"><span class="pre">RunOnce()</span></code> does nothing in this state. After setup, <code class="docutils literal notranslate"><span class="pre">Start()</span></code>
@@ -722,7 +722,7 @@ receives <code class="docutils literal notranslate"><span class="pre">Stop()</sp
 <h5>Application Interaction Views<a class="headerlink" href="#application-interaction-views" title="Link to this heading">#</a></h5>
 <p>Class diagram:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
-<object data="../../_images/plantuml-dde2a19b6ff2cf163c71fb086a0e7a9a5e283c9f.svg" type="image/svg+xml" style="width:1582px;height:898px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-dde2a19b6ff2cf163c71fb086a0e7a9a5e283c9f.svg" type="image/svg+xml" style="width:1582px;height:899px;background:#FFFFFF;"></object></p>
 </div><p>Initialization sequence showing component creation order and MessageBroker subscription wiring:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
 <object data="../../_images/plantuml-7ccf285bc7813b2c04594cebdc13506006c98e92.svg" type="image/svg+xml" style="width:1867px;height:1053px;background:#FFFFFF;"></object></p>
@@ -747,7 +747,7 @@ handling are covered by <a class="reference internal" href="#time-daemon-handler
 <h4>MessageBroker<a class="headerlink" href="#messagebroker" title="Link to this heading">#</a></h4>
 <p>Class diagram:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
-<object data="../../_images/plantuml-72685055e1087b28407f151060aaf17fe1d285e5.svg" type="image/svg+xml" style="width:1006px;height:603px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-72685055e1087b28407f151060aaf17fe1d285e5.svg" type="image/svg+xml" style="width:1005px;height:603px;background:#FFFFFF;"></object></p>
 </div><p>Initialization workflow:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
 <object data="../../_images/plantuml-2e41ed622d2977a34d005a69dc7f2d74c3aaed8b.svg" type="image/svg+xml" style="width:983px;height:741px;background:#FFFFFF;"></object></p>
@@ -759,7 +759,7 @@ handling are covered by <a class="reference internal" href="#time-daemon-handler
 <h4>ControlFlowDivider<a class="headerlink" href="#controlflowdivider" title="Link to this heading">#</a></h4>
 <p>Class diagram:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
-<object data="../../_images/plantuml-14061f241c4d8a0d8d327e602ad1c73fcbde5795.svg" type="image/svg+xml" style="width:739px;height:884px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-14061f241c4d8a0d8d327e602ad1c73fcbde5795.svg" type="image/svg+xml" style="width:739px;height:883px;background:#FFFFFF;"></object></p>
 </div><p>Initialization workflow:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
 <object data="../../_images/plantuml-3bdf35ce1361334ff577dbd622821527acc9c98a.svg" type="image/svg+xml" style="width:728px;height:650px;background:#FFFFFF;"></object></p>
@@ -771,7 +771,7 @@ handling are covered by <a class="reference internal" href="#time-daemon-handler
 <h4>PTPMachine<a class="headerlink" href="#ptpmachine" title="Link to this heading">#</a></h4>
 <p>Class diagram:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
-<object data="../../_images/plantuml-9156ea9ba6112c31eb56cb5765894753bd553808.svg" type="image/svg+xml" style="width:701px;height:868px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-9156ea9ba6112c31eb56cb5765894753bd553808.svg" type="image/svg+xml" style="width:701px;height:867px;background:#FFFFFF;"></object></p>
 </div><p>Initialization workflow:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
 <object data="../../_images/plantuml-be6bfbeaec13b880c3394c1f0dd295de88dbca8f.svg" type="image/svg+xml" style="width:777px;height:902px;background:#FFFFFF;"></object></p>
@@ -783,7 +783,7 @@ handling are covered by <a class="reference internal" href="#time-daemon-handler
 <h4>ShmPTPEngine<a class="headerlink" href="#shmptpengine" title="Link to this heading">#</a></h4>
 <p>Class diagram:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
-<object data="../../_images/plantuml-78be4959ee54dcf31437b281f4a134a1b9881f04.svg" type="image/svg+xml" style="width:1028px;height:1267px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-78be4959ee54dcf31437b281f4a134a1b9881f04.svg" type="image/svg+xml" style="width:1028px;height:1266px;background:#FFFFFF;"></object></p>
 </div><p>Initialization workflow:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
 <object data="../../_images/plantuml-72c803981a615920549de6cf985916f19bcec844.svg" type="image/svg+xml" style="width:1434px;height:1023px;background:#FFFFFF;"></object></p>
@@ -807,7 +807,7 @@ handling are covered by <a class="reference internal" href="#time-daemon-handler
 <h4>IPC Machine<a class="headerlink" href="#ipc-machine" title="Link to this heading">#</a></h4>
 <p>Class diagram:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
-<object data="../../_images/plantuml-ab446a41c0480b087c3c07bac3d26778ffd7a997.svg" type="image/svg+xml" style="width:1001px;height:726px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-ab446a41c0480b087c3c07bac3d26778ffd7a997.svg" type="image/svg+xml" style="width:1001px;height:725px;background:#FFFFFF;"></object></p>
 </div><p>Initialization workflow:</p>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
 <object data="../../_images/plantuml-ce29bc832f85e96f408ef197ab5b1ac7e4e4e0d6.svg" type="image/svg+xml" style="width:1412px;height:650px;background:#FFFFFF;"></object></p>
@@ -965,7 +965,7 @@ handling are covered by <a class="reference internal" href="#time-daemon-handler
 <li><p>A <code class="docutils literal notranslate"><span class="pre">score::time::qvt</span></code> library for diagnostic applications</p></li>
 </ol>
 <div style="overflow-x: auto; max-width: 100%;"><p class="plantuml">
-<object data="../../_images/plantuml-a9685a8880aea3d59792b1b58d636b4eff2cf5f3.svg" type="image/svg+xml" style="width:531px;height:1051px;background:#FFFFFF;"></object></p>
+<object data="../../_images/plantuml-a9685a8880aea3d59792b1b58d636b4eff2cf5f3.svg" type="image/svg+xml" style="width:552px;height:1051px;background:#FFFFFF;"></object></p>
 </div><p>The <code class="docutils literal notranslate"><span class="pre">Qualified</span> <span class="pre">Vehicle</span> <span class="pre">Time</span></code> component is integrated into the existing processing pipeline:</p>
 <ol class="arabic simple">
 <li><p>It subscribes to the <a class="reference internal" href="#verified-ptp-data"><span class="std std-ref">verified_ptp_data</span></a> topic from the <code class="docutils literal notranslate"><span class="pre">VerificationMachine</span></code></p></li>
